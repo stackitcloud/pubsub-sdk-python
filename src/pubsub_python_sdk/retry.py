@@ -9,6 +9,8 @@ from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import Any, TypeVar
 
+import httpx
+
 from pubsub_python_sdk.errors import (
     PubSubRetryError,
     PubSubServerError,
@@ -31,15 +33,6 @@ def _is_retryable_status(code: int) -> bool:
     return code in TRANSIENT_STATUS_CODES
 
 
-def _is_retryable_exception(exc: Exception) -> bool:
-    """Determine if an exception type is retryable."""
-    if isinstance(exc, (TimeoutError, ConnectionError, OSError)):
-        return True
-    if isinstance(exc, PubSubTimeoutError):
-        return True
-    return bool(isinstance(exc, PubSubServerError))
-
-
 # Retryable exceptions - only these get retried
 RETRYABLE_EXCEPTIONS = (
     TimeoutError,
@@ -47,6 +40,10 @@ RETRYABLE_EXCEPTIONS = (
     OSError,
     PubSubTimeoutError,
     PubSubServerError,
+    # httpx raises its own exception hierarchy that doesn't subclass the
+    # builtins above, so transient network failures must be listed explicitly.
+    httpx.TimeoutException,  # ConnectTimeout, ReadTimeout, WriteTimeout, PoolTimeout
+    httpx.NetworkError,  # ConnectError, ReadError, WriteError, CloseError
 )
 
 

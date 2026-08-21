@@ -66,8 +66,14 @@ class PubSubClient:
         )
 
     async def close(self) -> None:
-        """Release any shared resources."""
-        await self.auth_provider  # No-op, just ensuring cleanup point
+        """Release any shared resources.
+
+        PubSubClient itself holds no HTTP connections; publishers and
+        subscribers created via get_publisher()/get_subscriber() own their
+        own http_client and must be closed individually (or via
+        `async with`).
+        """
+        return None
 
 
 __all__ = [

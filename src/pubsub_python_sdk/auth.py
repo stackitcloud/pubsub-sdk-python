@@ -161,7 +161,7 @@ class StackitAuthProvider:
         # If we have credentials but the library isn't available, return a placeholder
         # In production this should never be hit if the library is installed
         if self.config.client_id and self.config.client_secret:
-            return f"Bearer {self.config.client_id}:{self.config.client_secret}", 3600
+            return f"{self.config.client_id}:{self.config.client_secret}", 3600
         from pubsub_python_sdk.errors import PubSubAuthenticationError
 
         raise PubSubAuthenticationError(

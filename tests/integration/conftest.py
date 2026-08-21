@@ -10,6 +10,7 @@ Requires the following secrets to be set:
 from __future__ import annotations
 
 import base64
+import contextlib
 import os
 import time
 from pathlib import Path
@@ -201,10 +202,18 @@ def _list_subscriptions(
     auth_header: dict[str, str],
 ) -> list[dict]:
     """List all subscriptions for a topic."""
-    url = f"{control_plane_url}/v1beta/projects/{project_id}/regions/{region}/topics/{topic_id}/subscriptions"
+    url = (
+        f"{control_plane_url}/v1beta/projects/"
+        f"{project_id}/regions/{region}/topics/"
+        f"{topic_id}/subscriptions"
+    )
 
     with httpx.Client() as client:
-        response = client.get(url, headers={**auth_header, "Content-Type": "application/json"}, timeout=30.0)
+        response = client.get(
+            url,
+            headers={**auth_header, "Content-Type": "application/json"},
+            timeout=30.0,
+        )
         response.raise_for_status()
         data = response.json()
         return data.get("subscriptions", [])
@@ -219,7 +228,11 @@ def _delete_subscription(
     auth_header: dict[str, str],
 ) -> None:
     """Delete a subscription via the control plane API."""
-    url = f"{control_plane_url}/v1beta/projects/{project_id}/regions/{region}/topics/{topic_id}/subscriptions/{subscription_id}"
+    url = (
+        f"{control_plane_url}/v1beta/projects/"
+        f"{project_id}/regions/{region}/topics/"
+        f"{topic_id}/subscriptions/{subscription_id}"
+    )
 
     with httpx.Client() as client:
         response = client.delete(
@@ -240,7 +253,11 @@ def _grant_topic_publisher_access(
     email: str,
 ) -> None:
     """Grant publisher access to a topic via the control plane API."""
-    url = f"{control_plane_url}/v1beta/projects/{project_id}/regions/{region}/topics/{topic_id}/publishers"
+    url = (
+        f"{control_plane_url}/v1beta/projects/"
+        f"{project_id}/regions/{region}/topics/"
+        f"{topic_id}/publishers"
+    )
 
     payload = {"emailAddress": email}
 
@@ -264,7 +281,11 @@ def _grant_subscription_subscriber_access(
     email: str,
 ) -> None:
     """Grant subscriber access to a subscription via the control plane API."""
-    url = f"{control_plane_url}/v1beta/projects/{project_id}/regions/{region}/topics/{topic_id}/subscriptions/{subscription_id}/subscribers"
+    url = (
+        f"{control_plane_url}/v1beta/projects/"
+        f"{project_id}/regions/{region}/topics/"
+        f"{topic_id}/subscriptions/{subscription_id}/subscribers"
+    )
 
     payload = {"emailAddress": email}
 
@@ -272,24 +293,6 @@ def _grant_subscription_subscriber_access(
         response = client.patch(
             url,
             json=payload,
-            headers={**auth_header, "Content-Type": "application/json"},
-            timeout=30.0,
-        )
-        response.raise_for_status()
-
-
-def _purge_topic_data_plane(
-    data_plane_url: str,
-    topic_id: str,
-    auth_header: dict[str, str],
-) -> None:
-    """Purge all messages from a topic via the data plane API."""
-    url = f"{data_plane_url}/v1alpha/purge"
-
-    with httpx.Client() as client:
-        response = client.post(
-            url,
-            json={},
             headers={**auth_header, "Content-Type": "application/json"},
             timeout=30.0,
         )
@@ -461,7 +464,7 @@ def subscription_id(
             print(f"Subscription {sub_id} is active")
         except TimeoutError:
             print(f"Subscription {sub_id} not active, creating new subscription")
-            try:
+            with contextlib.suppress(Exception):
                 _delete_subscription(
                     control_plane_url=control_plane_url,
                     project_id=project_id,
@@ -470,8 +473,6 @@ def subscription_id(
                     subscription_id=sub_id,
                     auth_header=auth_header,
                 )
-            except Exception:
-                pass
             existing_subs = []
 
     if not existing_subs:
@@ -522,15 +523,15 @@ async def subscriber(pubsub_client: PubSubClient, subscription_id: str):
 
 
 @pytest.fixture(autouse=True)
-async def purge_between_tests(
-    pubsub_client: PubSubClient,
-    auth_header: dict[str, str],
-):
+async def purge_between_tests(pubsub_client: PubSubClient):
     """Purge topic messages between tests using the data plane API."""
     yield
 
+    pub = pubsub_client.get_publisher()
     try:
-        await pubsub_client.get_publisher().purge_topic()
+        await pub.purge_topic()
         print(f"Purged topic: {pubsub_client.topic_id}")
     except Exception as e:
         print(f"Failed to purge topic: {e}")
+    finally:
+        await pub.close()
