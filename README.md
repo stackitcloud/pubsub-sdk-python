@@ -1,8 +1,8 @@
 # pubsub-sdk-python
 
-Python SDK for the **STACKIT PubSub Data Plane API** — publish messages to topics and pull/ack/nack them from subscriptions.
+Python SDK for the **STACKIT PubSub Data Plane API**.
 
-This SDK covers the **data plane only** (publish, pull, ack, nack). Creating/deleting topics and subscriptions, and granting publisher/subscriber access, is done via the separate STACKIT PubSub **control plane** REST API (see `tests/integration/conftest.py` for example calls) or the STACKIT Portal — not by this package.
+This SDK covers the **data plane only** (publish, pull, ack, nack). Creating/deleting topics and subscriptions, and granting publisher/subscriber access, is done via the separate STACKIT PubSub **control plane** REST API (see `tests/integration/conftest.py` for example calls) or the STACKIT Portal.
 
 ## Install
 
@@ -72,14 +72,14 @@ Other methods: `publisher.publish_batch(messages, batch_size=100)`, `publisher.p
 
 All exceptions subclass `PubSubError`:
 
-| Exception | Raised when |
-|---|---|
-| `PubSubValidationError` | Bad request (HTTP 400/413), or local validation (empty message list, >100 messages, `max_messages`/`long_pull_duration_ms` out of range, empty ack/nack list) |
-| `PubSubNotFoundError` | HTTP 404 |
-| `PubSubAuthenticationError` | HTTP 401, or token acquisition failure |
-| `PubSubServerError` | HTTP 5xx (transient — triggers a retry, see below) |
-| `PubSubRetryError` | All retry attempts exhausted; `.causes` holds the underlying exceptions |
-| `PubSubTimeoutError` | Request timed out (also a `TimeoutError`) |
+| Exception                   | Raised when                                                                                                                                                   |
+|-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `PubSubValidationError`     | Bad request (HTTP 400/413), or local validation (empty message list, >100 messages, `max_messages`/`long_pull_duration_ms` out of range, empty ack/nack list) |
+| `PubSubNotFoundError`       | HTTP 404                                                                                                                                                      |
+| `PubSubAuthenticationError` | HTTP 401, or token acquisition failure                                                                                                                        |
+| `PubSubServerError`         | HTTP 5xx (transient - triggers a retry, see below)                                                                                                            |
+| `PubSubRetryError`          | All retry attempts exhausted; `.causes` holds the underlying exceptions                                                                                       |
+| `PubSubTimeoutError`        | Request timed out (also a `TimeoutError`)                                                                                                                     |
 
 ## Retries
 
@@ -92,16 +92,3 @@ retry_config = RetryConfig(max_retries=3, base_delay=0.5, max_delay=30.0, multip
 ```
 
 400/401/404/413 are never retried. The standalone decorators `with_retry`/`with_async_retry` (in `pubsub_sdk_python.retry`) apply the same policy to arbitrary functions.
-
-## Testing
-
-```bash
-uv run pytest                          # unit tests (mocked HTTP), 85% coverage gate
-uv run pytest tests/integration/ --no-cov   # integration tests, hits a real STACKIT environment
-```
-
-Integration tests require `SA_KEY_B64` (or `SA_KEY`/`SA_KEY_PATH`), `PROJECT_ID`, `TOKEN_URL`, `REGION` in the environment — they create real topics/subscriptions via the control plane and clean up after themselves.
-
-## License
-
-No `LICENSE` file is present in this repository yet.
