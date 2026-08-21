@@ -51,12 +51,12 @@ class RetryConfig:
     """Configuration for retry behavior.
 
     Attributes:
-        max_retries: Maximum number of retry attempts (0 = no retries).
-        base_delay: Base delay in seconds between retries.
-        max_delay: Maximum delay in seconds between retries.
-        multiplier: Multiplier applied to delay after each retry (exponential backoff).
-        retryable_exceptions: Tuple of exception types that trigger a retry.
-        retryable_status_codes: Set of HTTP status codes that trigger a retry.
+        max_retries (int): Maximum number of retry attempts (0 = no retries).
+        base_delay (float): Base delay in seconds between retries.
+        max_delay (float): Maximum delay in seconds between retries.
+        multiplier (float): Multiplier applied to delay after each retry (exponential backoff).
+        retryable_exceptions (tuple[type[Exception], ...]): Exception types that trigger a retry.
+        retryable_status_codes (set[int]): HTTP status codes that trigger a retry.
     """
 
     def __init__(
@@ -68,12 +68,14 @@ class RetryConfig:
         retryable_exceptions: tuple[type[Exception], ...] | None = None,
         retryable_status_codes: set[int] | None = None,
     ):
-        self.max_retries = max_retries
-        self.base_delay = base_delay
-        self.max_delay = max_delay
-        self.multiplier = multiplier
-        self.retryable_exceptions = retryable_exceptions or RETRYABLE_EXCEPTIONS
-        self.retryable_status_codes = retryable_status_codes or TRANSIENT_STATUS_CODES
+        self.max_retries: int = max_retries
+        self.base_delay: float = base_delay
+        self.max_delay: float = max_delay
+        self.multiplier: float = multiplier
+        self.retryable_exceptions: tuple[type[Exception], ...] = (
+            retryable_exceptions or RETRYABLE_EXCEPTIONS
+        )
+        self.retryable_status_codes: set[int] = retryable_status_codes or TRANSIENT_STATUS_CODES
 
 
 def _calculate_delay(config: RetryConfig, attempt: int) -> float:

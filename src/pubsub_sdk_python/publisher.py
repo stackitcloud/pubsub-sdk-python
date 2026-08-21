@@ -39,15 +39,15 @@ class PubSubPublisher:
     retry logic for transient errors.
 
     Attributes:
-        topic_id: The topic identifier (UUID).
-        base_url: The dataplane base URL.
-        auth_provider: Provider for STACKIT authorization tokens.
-        retry_config: Configuration for retry behavior.
-        http_client: Shared HTTP client instance.
-        _messages_sent: Total count of messages sent.
-        _publish_calls: Total count of publish calls made.
-        _purge_calls: Total count of purge calls made.
-        _messages_purged: Count of messages purged (when available).
+        topic_id (str): The topic identifier (UUID).
+        base_url (str): The dataplane base URL.
+        auth_provider (StackitAuthProvider): Provider for STACKIT authorization tokens.
+        retry_config (RetryConfig): Configuration for retry behavior.
+        http_client (httpx.AsyncClient): Shared HTTP client instance.
+        _messages_sent (int): Total count of messages sent.
+        _publish_calls (int): Total count of publish calls made.
+        _purge_calls (int): Total count of purge calls made.
+        _messages_purged (int): Count of messages purged (when available).
     """
 
     topic_id: str

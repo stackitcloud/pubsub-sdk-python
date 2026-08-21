@@ -14,11 +14,11 @@ class AuthConfig:
     """Configuration for STACKIT authorization.
 
     Attributes:
-        service_account_key: Path to or content of the service account key JSON.
-        token_endpoint: OAuth2 token endpoint URL.
-        client_id: OAuth2 client ID.
-        client_secret: OAuth2 client secret.
-        scope: OAuth2 scope(s) to request.
+        service_account_key (str | None): Path to or content of the service account key JSON.
+        token_endpoint (str | None): OAuth2 token endpoint URL.
+        client_id (str | None): OAuth2 client ID.
+        client_secret (str | None): OAuth2 client secret.
+        scope (str): OAuth2 scope(s) to request.
     """
 
     service_account_key: str | None = None
@@ -35,13 +35,13 @@ class StackitAuthProvider:
     that can be included in API requests.
 
     Attributes:
-        config: The authentication configuration.
-        _token: The current access token (cached until expiry).
-        _expires_at: Unix timestamp when the current token expires.
+        config (AuthConfig): The authentication configuration.
+        _token (str | None): The current access token (cached until expiry).
+        _expires_at (float): Unix timestamp when the current token expires.
     """
 
     def __init__(self, config: AuthConfig):
-        self.config = config
+        self.config: AuthConfig = config
         self._token: str | None = None
         self._expires_at: float = 0.0
         self._tokens: list[dict[str, Any]] = []

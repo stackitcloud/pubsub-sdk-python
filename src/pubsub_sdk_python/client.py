@@ -16,9 +16,10 @@ class PubSubClient:
     sharing authentication and HTTP client resources.
 
     Attributes:
-        auth_provider: Provider for STACKIT authorization tokens.
-        topic_id: The topic identifier.
-        base_url: The dataplane base URL.
+        auth_provider (StackitAuthProvider): Provider for STACKIT authorization tokens.
+        topic_id (str): The topic identifier.
+        auth_config (AuthConfig): The authentication configuration.
+        base_url (str): The dataplane base URL.
     """
 
     def __init__(
@@ -27,10 +28,10 @@ class PubSubClient:
         auth_config: AuthConfig | None = None,
         base_url: str = "https://{topicId}.pubsub.eu01.onstackit.cloud",
     ) -> None:
-        self.topic_id = topic_id
-        self.auth_config = auth_config or AuthConfig()
-        self.auth_provider = StackitAuthProvider(self.auth_config)
-        self.base_url = base_url.format(topicId=topic_id)
+        self.topic_id: str = topic_id
+        self.auth_config: AuthConfig = auth_config or AuthConfig()
+        self.auth_provider: StackitAuthProvider = StackitAuthProvider(self.auth_config)
+        self.base_url: str = base_url.format(topicId=topic_id)
 
     def get_publisher(self, **kwargs: Any) -> PubSubPublisher:
         """Create a new Publisher instance for this topic.

@@ -12,7 +12,7 @@ class PublishMessage:
     """A single message to publish to a topic.
 
     Attributes:
-        data: Base64-encoded message payload.
+        data (str): Base64-encoded message payload.
     """
 
     data: str

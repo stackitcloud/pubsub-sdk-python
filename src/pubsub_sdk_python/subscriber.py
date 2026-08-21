@@ -51,17 +51,17 @@ class PubSubSubscriber:
     with built-in retry logic for transient errors.
 
     Attributes:
-        subscription_id: The subscription identifier (UUID).
-        base_url: The dataplane base URL.
-        auth_provider: Provider for STACKIT authorization tokens.
-        retry_config: Configuration for retry behavior.
-        http_client: Shared HTTP client instance.
-        _messages_received: Total count of messages pulled.
-        _messages_acked: Total count of messages acknowledged.
-        _messages_nacked: Total count of messages negatively acknowledged.
-        _pull_calls: Total count of pull API calls made.
-        _ack_calls: Total count of ack API calls made.
-        _nack_calls: Total count of nack API calls made.
+        subscription_id (str): The subscription identifier (UUID).
+        base_url (str): The dataplane base URL.
+        auth_provider (StackitAuthProvider): Provider for STACKIT authorization tokens.
+        retry_config (RetryConfig): Configuration for retry behavior.
+        http_client (httpx.AsyncClient): Shared HTTP client instance.
+        _messages_received (int): Total count of messages pulled.
+        _messages_acked (int): Total count of messages acknowledged.
+        _messages_nacked (int): Total count of messages negatively acknowledged.
+        _pull_calls (int): Total count of pull API calls made.
+        _ack_calls (int): Total count of ack API calls made.
+        _nack_calls (int): Total count of nack API calls made.
     """
 
     subscription_id: str
