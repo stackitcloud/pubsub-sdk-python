@@ -1,5 +1,5 @@
 [project]
-name = "pubsub-python-sdk"
+name = "pubsub-sdk-python"
 version = "0.1.0"
 description = "A robust Python SDK for STACKIT PubSub Data Plane API"
 readme = "README.md"
@@ -22,7 +22,7 @@ dev = [
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = "--cov=src/pubsub_python_sdk --cov-report=term-missing --cov-fail-under=85 --ignore=tests/integration"
+addopts = "--cov=src/pubsub_sdk_python --cov-report=term-missing --cov-fail-under=85 --ignore=tests/integration"
 markers = ["integration: marks tests as integration tests (deselect with '-m \"not integration\"')"]
 
 [tool.ruff]
@@ -35,4 +35,4 @@ select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "RUF"]
 ignore = []
 
 [tool.ruff.lint.isort]
-known-first-party = ["pubsub_python_sdk"]
+known-first-party = ["pubsub_sdk_python"]

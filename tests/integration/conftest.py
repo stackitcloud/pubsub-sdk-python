@@ -18,9 +18,9 @@ from pathlib import Path
 import httpx
 import pytest
 
-from pubsub_python_sdk.auth import AuthConfig
-from pubsub_python_sdk.client import PubSubClient
-from pubsub_python_sdk.retry import with_retry
+from pubsub_sdk_python.auth import AuthConfig
+from pubsub_sdk_python.client import PubSubClient
+from pubsub_sdk_python.retry import with_retry
 
 SA_KEY_PATH = "sa-key.json"
 SA_EMAIL = "break-test-jennifer-qzj3sci8@sa.stackit.cloud"
@@ -55,7 +55,7 @@ def _get_control_plane_url() -> str:
 
 def _create_auth_header(auth_config: AuthConfig) -> dict[str, str]:
     """Create an auth header using the StackitAuthProvider."""
-    from pubsub_python_sdk.auth import StackitAuthProvider
+    from pubsub_sdk_python.auth import StackitAuthProvider
 
     provider = StackitAuthProvider(auth_config)
     return provider.get_auth_header()

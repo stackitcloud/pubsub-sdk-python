@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pubsub_python_sdk.auth import AuthConfig, StackitAuthProvider
-from pubsub_python_sdk.publisher import PubSubPublisher
-from pubsub_python_sdk.subscriber import PubSubSubscriber
+from pubsub_sdk_python.auth import AuthConfig, StackitAuthProvider
+from pubsub_sdk_python.publisher import PubSubPublisher
+from pubsub_sdk_python.subscriber import PubSubSubscriber
 
 
 class PubSubClient:

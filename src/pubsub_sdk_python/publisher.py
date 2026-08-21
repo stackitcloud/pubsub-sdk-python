@@ -10,19 +10,19 @@ from typing import Any
 
 import httpx
 
-from pubsub_python_sdk.auth import StackitAuthProvider
-from pubsub_python_sdk.errors import (
+from pubsub_sdk_python.auth import StackitAuthProvider
+from pubsub_sdk_python.errors import (
     PubSubError,
     PubSubNotFoundError,
     PubSubRetryError,
     PubSubServerError,
     PubSubValidationError,
 )
-from pubsub_python_sdk.models import (
+from pubsub_sdk_python.models import (
     PublishMessage,
     PublishMessageResponse,
 )
-from pubsub_python_sdk.retry import (
+from pubsub_sdk_python.retry import (
     RetryConfig,
     _calculate_delay,
     _is_retryable_status,
@@ -148,7 +148,7 @@ class PubSubPublisher:
                 if response.status_code == 404:
                     raise PubSubNotFoundError(f"Resource not found: {response.text}")
                 if response.status_code == 401:
-                    from pubsub_python_sdk.errors import PubSubAuthenticationError
+                    from pubsub_sdk_python.errors import PubSubAuthenticationError
 
                     raise PubSubAuthenticationError(f"Unauthorized: {response.text}")
 

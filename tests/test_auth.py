@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pubsub_python_sdk.auth import AuthConfig, StackitAuthProvider
-from pubsub_python_sdk.errors import PubSubAuthenticationError
+from pubsub_sdk_python.auth import AuthConfig, StackitAuthProvider
+from pubsub_sdk_python.errors import PubSubAuthenticationError
 
 SAMPLE_SA_KEY = {
     "active": True,

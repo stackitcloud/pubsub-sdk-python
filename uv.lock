@@ -536,7 +536,7 @@ wheels = [
 ]
 
 [[package]]
-name = "pubsub-python-sdk"
+name = "pubsub-sdk-python"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

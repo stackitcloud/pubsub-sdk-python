@@ -1,4 +1,4 @@
-# pubsub-python-sdk
+# pubsub-sdk-python
 
 Python SDK for the **STACKIT PubSub Data Plane API** — publish messages to topics and pull/ack/nack them from subscriptions.
 
@@ -20,7 +20,7 @@ Requires Python >= 3.11. Runtime dependencies: `httpx`, `stackit-authorization`.
 Authentication goes through `AuthConfig` + `StackitAuthProvider`, backed by a STACKIT service account key.
 
 ```python
-from pubsub_python_sdk import AuthConfig, PubSubClient
+from pubsub_sdk_python import AuthConfig, PubSubClient
 
 auth_config = AuthConfig(
     service_account_key=open("sa-key.json").read(),  # or the raw JSON string
@@ -34,7 +34,7 @@ auth_config = AuthConfig(
 
 ```python
 import asyncio
-from pubsub_python_sdk import PubSubClient, PublishMessage
+from pubsub_sdk_python import PubSubClient, PublishMessage
 
 async def main():
     client = PubSubClient(topic_id="<topic-id>", auth_config=auth_config)
@@ -79,12 +79,12 @@ All exceptions subclass `PubSubError`:
 `PubSubPublisher`/`PubSubSubscriber` retry automatically on network/timeout errors (`httpx.TimeoutException`, `httpx.NetworkError`, `OSError`, `ConnectionError`, `TimeoutError`) and HTTP 500/502/503/504, with exponential backoff + jitter. Configure via `retry_config=RetryConfig(...)` passed to the publisher/subscriber constructor (or `get_publisher()`/`get_subscriber()` kwargs):
 
 ```python
-from pubsub_python_sdk import RetryConfig
+from pubsub_sdk_python import RetryConfig
 
 retry_config = RetryConfig(max_retries=3, base_delay=0.5, max_delay=30.0, multiplier=2.0)
 ```
 
-400/401/404/413 are never retried. The standalone decorators `with_retry`/`with_async_retry` (in `pubsub_python_sdk.retry`) apply the same policy to arbitrary functions.
+400/401/404/413 are never retried. The standalone decorators `with_retry`/`with_async_retry` (in `pubsub_sdk_python.retry`) apply the same policy to arbitrary functions.
 
 ## Testing
 

@@ -11,7 +11,7 @@ from typing import Any, TypeVar
 
 import httpx
 
-from pubsub_python_sdk.errors import (
+from pubsub_sdk_python.errors import (
     PubSubRetryError,
     PubSubServerError,
     PubSubTimeoutError,

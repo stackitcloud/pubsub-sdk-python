@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 
-from pubsub_python_sdk.auth import AuthConfig, StackitAuthProvider
-from pubsub_python_sdk.models import PublishMessage
+from pubsub_sdk_python.auth import AuthConfig, StackitAuthProvider
+from pubsub_sdk_python.models import PublishMessage
 
 
 @pytest.fixture

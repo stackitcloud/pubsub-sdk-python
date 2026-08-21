@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from pubsub_python_sdk.auth import AuthConfig
-from pubsub_python_sdk.client import PubSubClient
-from pubsub_python_sdk.publisher import PubSubPublisher
-from pubsub_python_sdk.subscriber import PubSubSubscriber
+from pubsub_sdk_python.auth import AuthConfig
+from pubsub_sdk_python.client import PubSubClient
+from pubsub_sdk_python.publisher import PubSubPublisher
+from pubsub_sdk_python.subscriber import PubSubSubscriber
 
 
 class TestPubSubClientInit:

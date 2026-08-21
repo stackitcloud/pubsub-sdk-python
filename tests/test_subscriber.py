@@ -6,15 +6,15 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 
-from pubsub_python_sdk.errors import (
+from pubsub_sdk_python.errors import (
     PubSubAuthenticationError,
     PubSubNotFoundError,
     PubSubRetryError,
     PubSubServerError,
     PubSubValidationError,
 )
-from pubsub_python_sdk.models import Message
-from pubsub_python_sdk.subscriber import PubSubSubscriber
+from pubsub_sdk_python.models import Message
+from pubsub_sdk_python.subscriber import PubSubSubscriber
 
 
 class TestPubSubSubscriberInit:

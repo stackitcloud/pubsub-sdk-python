@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from pubsub_python_sdk.models import PublishMessage
+from pubsub_sdk_python.models import PublishMessage
 
 
 @pytest.mark.integration
@@ -26,7 +26,7 @@ async def test_publish_and_purge(publisher):
 @pytest.mark.integration
 async def test_publish_empty_raises(publisher):
     """Test that publishing an empty list raises an error."""
-    from pubsub_python_sdk.errors import PubSubValidationError
+    from pubsub_sdk_python.errors import PubSubValidationError
 
     with pytest.raises(PubSubValidationError, match="Cannot publish an empty list"):
         await publisher.publish([])
@@ -60,7 +60,7 @@ async def test_purge_topic_with_confirm(publisher):
 @pytest.mark.integration
 async def test_purge_topic_with_confirm_invalid(publisher):
     """Test that purging with invalid confirmation raises."""
-    from pubsub_python_sdk.errors import PubSubValidationError
+    from pubsub_sdk_python.errors import PubSubValidationError
 
     with pytest.raises(PubSubValidationError, match="must be 'purge'"):
         await publisher.purge_topic_with_confirm("wrong")
@@ -69,7 +69,7 @@ async def test_purge_topic_with_confirm_invalid(publisher):
 @pytest.mark.integration
 async def test_context_manager(publisher):
     """Test that the publisher works as a context manager."""
-    from pubsub_python_sdk.publisher import PubSubPublisher
+    from pubsub_sdk_python.publisher import PubSubPublisher
 
     messages = [PublishMessage.from_plain("context-manager-test")]
 
@@ -152,7 +152,7 @@ async def test_nack_messages_helper(subscriber, publisher):
 @pytest.mark.integration
 async def test_context_manager_subscriber(subscriber):
     """Test that the subscriber works as a context manager."""
-    from pubsub_python_sdk.subscriber import PubSubSubscriber
+    from pubsub_sdk_python.subscriber import PubSubSubscriber
 
     async with subscriber as sub:
         assert isinstance(sub, PubSubSubscriber)
@@ -231,7 +231,7 @@ async def test_pull_with_custom_parameters(subscriber, publisher):
 @pytest.mark.integration
 async def test_pull_from_nonexistent_subscription_raises_not_found(pubsub_client):
     """Test that pulling from a nonexistent subscription raises PubSubNotFoundError."""
-    from pubsub_python_sdk.errors import PubSubNotFoundError
+    from pubsub_sdk_python.errors import PubSubNotFoundError
 
     bogus_subscriber = pubsub_client.get_subscriber(subscription_id=str(uuid.uuid4()))
     try:

@@ -3,10 +3,10 @@
 A robust Python client for publishing and subscribing to STACKIT PubSub topics.
 """
 
-from pubsub_python_sdk import auth, client, errors, models, publisher, retry, subscriber
-from pubsub_python_sdk.auth import AuthConfig, StackitAuthProvider
-from pubsub_python_sdk.client import PubSubClient
-from pubsub_python_sdk.errors import (
+from pubsub_sdk_python import auth, client, errors, models, publisher, retry, subscriber
+from pubsub_sdk_python.auth import AuthConfig, StackitAuthProvider
+from pubsub_sdk_python.client import PubSubClient
+from pubsub_sdk_python.errors import (
     PubSubAuthenticationError,
     PubSubError,
     PubSubNotFoundError,
@@ -15,7 +15,7 @@ from pubsub_python_sdk.errors import (
     PubSubTimeoutError,
     PubSubValidationError,
 )
-from pubsub_python_sdk.models import (
+from pubsub_sdk_python.models import (
     AckMessagesFromTopicRequest,
     Message,
     Messages,
@@ -26,15 +26,15 @@ from pubsub_python_sdk.models import (
     decode_message_data,
     decode_message_text,
 )
-from pubsub_python_sdk.publisher import PubSubPublisher
-from pubsub_python_sdk.retry import (
+from pubsub_sdk_python.publisher import PubSubPublisher
+from pubsub_sdk_python.retry import (
     RETRYABLE_EXCEPTIONS,
     RetryConfig,
     get_retry_delay,
     with_async_retry,
     with_retry,
 )
-from pubsub_python_sdk.subscriber import PubSubSubscriber
+from pubsub_sdk_python.subscriber import PubSubSubscriber
 
 __version__ = "0.1.0"
 

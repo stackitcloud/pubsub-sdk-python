@@ -3,7 +3,7 @@
 import base64
 from datetime import datetime
 
-from pubsub_python_sdk.models import (
+from pubsub_sdk_python.models import (
     AckMessagesFromTopicRequest,
     Message,
     Messages,

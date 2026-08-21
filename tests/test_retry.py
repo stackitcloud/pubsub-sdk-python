@@ -5,14 +5,14 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 
-from pubsub_python_sdk.errors import (
+from pubsub_sdk_python.errors import (
     PubSubRetryError,
     PubSubServerError,
     PubSubValidationError,
 )
-from pubsub_python_sdk.models import PublishMessage
-from pubsub_python_sdk.publisher import PubSubPublisher
-from pubsub_python_sdk.retry import (
+from pubsub_sdk_python.models import PublishMessage
+from pubsub_sdk_python.publisher import PubSubPublisher
+from pubsub_sdk_python.retry import (
     RetryConfig,
     _calculate_delay,
     _is_retryable_status,

@@ -148,7 +148,7 @@ class StackitAuthProvider:
             )
             return self._get_fallback_token()
         except Exception as exc:
-            from pubsub_python_sdk.errors import PubSubAuthenticationError
+            from pubsub_sdk_python.errors import PubSubAuthenticationError
 
             raise PubSubAuthenticationError(f"Failed to obtain STACKIT token: {exc}") from exc
 
@@ -162,7 +162,7 @@ class StackitAuthProvider:
         # In production this should never be hit if the library is installed
         if self.config.client_id and self.config.client_secret:
             return f"{self.config.client_id}:{self.config.client_secret}", 3600
-        from pubsub_python_sdk.errors import PubSubAuthenticationError
+        from pubsub_sdk_python.errors import PubSubAuthenticationError
 
         raise PubSubAuthenticationError(
             "No credentials configured and stackit.authorization unavailable"
