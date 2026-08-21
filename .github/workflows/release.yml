@@ -5,8 +5,36 @@ on:
     types: [published]
 
 jobs:
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.14"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+          uv pip install -e .
+
+      - name: Run ruff check
+        run: uv run ruff check src/ tests/
+
+      - name: Run ruff format check
+        run: uv run ruff format --check src/ tests/
+
+      - name: Run pytest with coverage
+        run: uv run pytest --cov=src/pubsub_sdk_python --cov-branch --cov-report=term-missing --cov-fail-under=85
+
   build:
     name: Build distribution
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -29,7 +57,7 @@ jobs:
 
   publish:
     name: Publish to PyPI
-    needs: build
+    needs: [test, build]
     runs-on: ubuntu-latest
     environment:
       name: pypi

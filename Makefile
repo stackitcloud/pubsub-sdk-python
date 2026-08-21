@@ -15,4 +15,4 @@ test: check install
 	uv run pytest
 
 test-cov: check install
-	uv run pytest --cov=src/pubsub_python_sdk --cov-report=term-missing --cov-fail-under=85
+	uv run pytest --cov=src/pubsub_sdk_python --cov-branch --cov-report=term-missing --cov-fail-under=85
