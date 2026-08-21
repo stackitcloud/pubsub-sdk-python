@@ -50,13 +50,13 @@ def auth_config(sa_key: str) -> AuthConfig:
 
 
 @pytest.fixture()
-def base_url() -> str:
-    """Get the base URL from environment or construct from REGION."""
+def base_url(topic_id: str) -> str:
+    """Get the base URL from environment or construct from REGION and TOPIC_ID."""
     base_url = os.environ.get("BASE_URL")
     if base_url:
         return base_url
     region = os.environ.get("REGION", "eu01")
-    return f"https://pubsub-dev.api.{region}.qa.stackit.cloud"
+    return f"https://{topic_id}.pubsub.{region}.qa.stackit.cloud"
 
 
 @pytest.fixture()

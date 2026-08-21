@@ -49,7 +49,7 @@ class StackitAuthProvider:
     def _get_token_from_stackit(self) -> tuple[str, float]:
         """Fetch a token from STACKIT authorization service.
 
-        Uses the stackit.authorization library to obtain an OAuth2 access token.
+        Uses the stackit-core library to obtain an OAuth2 access token.
         Falls back to cached credentials if the library is not available.
 
         Returns:
@@ -59,29 +59,89 @@ class StackitAuthProvider:
             PubSubAuthenticationError: If authentication fails.
         """
         try:
-            import stackit.authorization as sa
+            import json as json_lib
+            from datetime import datetime
 
-            # Use the stackit.authorization library to get credentials
-            if self.config.service_account_key:
-                credentials = sa.from_service_account_key(self.config.service_account_key)
-            elif self.config.client_id and self.config.client_secret:
-                credentials = sa.from_client_credentials(
-                    client_id=self.config.client_id,
-                    client_secret=self.config.client_secret,
-                    token_endpoint=self.config.token_endpoint,
-                    scope=self.config.scope,
-                )
+            from stackit.core.auth_methods.key_auth import KeyAuth
+            from stackit.core.authorization import (
+                Authorization,
+                Configuration,
+                ServiceAccountKey,
+            )
+
+            # Patch KeyAuth to handle missing refresh_token
+            if not hasattr(KeyAuth, "_KeyAuth__patched"):
+
+                def _patched_fetch(self: KeyAuth) -> None:
+                    body = {
+                        "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                        "assertion": self.initial_token,
+                    }
+                    try:
+                        import requests
+
+                        response = requests.post(
+                            self.token_endpoint, data=body, timeout=self.timeout
+                        )
+                        response.raise_for_status()
+                        response_json = response.json()
+                        self.access_token = response_json["access_token"]
+                        self.refresh_token = response_json.get("refresh_token", "")
+                    except requests.RequestException as e:
+                        raise requests.RequestException("Initial token fetch failed") from e
+
+                KeyAuth._KeyAuth__fetch_token_from_endpoint = _patched_fetch
+                KeyAuth._KeyAuth__patched = True
+
+            sa_key_content = self.config.service_account_key
+
+            if sa_key_content and sa_key_content.strip().startswith("{"):
+                sa_key_data = json_lib.loads(sa_key_content)
+            elif sa_key_content:
+                with open(sa_key_content) as f:
+                    sa_key_data = json_lib.loads(f.read())
             else:
-                credentials = sa.from_default_credentials(scope=self.config.scope)
+                raise ValueError("No service account key configured")
 
-            token_data = credentials.get_token()
-            return token_data.token, token_data.expires_in if hasattr(
-                token_data, "expires_in"
-            ) else 3600
+            cred = sa_key_data.get("credentials", {})
+
+            credentials_dict = {
+                "active": sa_key_data.get("active", True),
+                "createdAt": datetime.fromisoformat(
+                    sa_key_data["createdAt"].replace("Z", "+00:00")
+                ),
+                "credentials": {
+                    "aud": cred.get("aud"),
+                    "iss": cred.get("iss"),
+                    "kid": cred.get("kid"),
+                    "sub": cred.get("sub"),
+                    "privateKey": cred.get("privateKey"),
+                    "tokenEndpoint": cred.get("tokenEndpoint"),
+                },
+                "id": sa_key_data["id"],
+                "keyAlgorithm": sa_key_data.get("keyAlgorithm"),
+                "keyOrigin": sa_key_data.get("keyOrigin"),
+                "keyType": sa_key_data.get("keyType"),
+                "publicKey": sa_key_data.get("publicKey"),
+            }
+
+            credentials = ServiceAccountKey.model_validate(credentials_dict)
+
+            config = Configuration(
+                service_account_key=credentials,
+                custom_token_endpoint=cred.get("tokenEndpoint", self.config.token_endpoint),
+            )
+
+            auth = Authorization(config)
+            auth.service_account_key = credentials
+            auth.auth_method = auth._Authorization__get_authentication()
+
+            token = auth.auth_method.access_token
+            return token, 3600
 
         except ImportError:
             logger.warning(
-                "stackit.authorization not installed; using fallback token provider. "
+                "stackit-core not installed; using fallback token provider. "
                 "Install the package for full authentication support."
             )
             return self._get_fallback_token()
