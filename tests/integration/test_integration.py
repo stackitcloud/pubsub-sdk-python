@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 
 from pubsub_python_sdk.models import PublishMessage
@@ -154,3 +156,112 @@ async def test_context_manager_subscriber(subscriber):
 
     async with subscriber as sub:
         assert isinstance(sub, PubSubSubscriber)
+
+
+@pytest.mark.integration
+async def test_message_content_round_trip(subscriber, publisher):
+    """Test that a message's content survives the publish/pull round-trip intact."""
+    marker = str(uuid.uuid4())[:8]
+    text = f"round-trip-test-{marker}"
+    await publisher.publish([PublishMessage.from_plain(text)])
+
+    pulled_messages = await subscriber.pull(max_messages=1)
+    assert len(pulled_messages) >= 1
+
+    msg = pulled_messages[0]
+    assert msg.text == text
+    assert msg.payload == text.encode("utf-8")
+
+    await subscriber.ack([msg.ack_id])
+
+
+@pytest.mark.integration
+async def test_purge_removes_messages(subscriber, publisher):
+    """Test that purging the topic actually removes previously published messages."""
+    marker = str(uuid.uuid4())[:8]
+    purged_texts = {f"purge-test-{marker}-{i}" for i in range(2)}
+    messages = [PublishMessage.from_plain(text) for text in purged_texts]
+    await publisher.publish(messages)
+
+    purge_calls_before = publisher.purge_calls
+    await publisher.purge_topic()
+    assert publisher.purge_calls == purge_calls_before + 1
+    assert publisher.messages_purged == -1
+
+    pulled_messages = await subscriber.pull(max_messages=32)
+    remaining = {msg.text for msg in pulled_messages if msg.text in purged_texts}
+    assert remaining == set()
+
+
+@pytest.mark.integration
+async def test_pull_stream_invokes_callback(subscriber, publisher):
+    """Test that pull_stream invokes the on_message callback for each pulled message."""
+    marker = str(uuid.uuid4())[:8]
+    text = f"pull-stream-test-{marker}"
+    await publisher.publish([PublishMessage.from_plain(text)])
+
+    received = []
+    result = await subscriber.pull_stream(max_messages=1, on_message=received.append)
+
+    assert any(msg.text == text for msg in received)
+    assert any(msg.text == text for msg in result)
+
+    ack_ids = [msg.ack_id for msg in result if msg.text == text]
+    await subscriber.ack(ack_ids)
+
+
+@pytest.mark.integration
+async def test_pull_with_custom_parameters(subscriber, publisher):
+    """Test that pull accepts non-default max_messages and long_pull_duration_ms."""
+    await publisher.publish([PublishMessage.from_plain("custom-pull-params-test")])
+
+    pulled_messages = await subscriber.pull(max_messages=1, long_pull_duration_ms=500)
+    assert len(pulled_messages) <= 1
+
+    # Upper bound for max_messages should be accepted without raising.
+    upper_bound_messages = await subscriber.pull(max_messages=32, long_pull_duration_ms=500)
+    assert isinstance(upper_bound_messages, list)
+
+    if pulled_messages:
+        await subscriber.ack([msg.ack_id for msg in pulled_messages])
+    if upper_bound_messages:
+        await subscriber.ack([msg.ack_id for msg in upper_bound_messages])
+
+
+@pytest.mark.integration
+async def test_pull_from_nonexistent_subscription_raises_not_found(pubsub_client):
+    """Test that pulling from a nonexistent subscription raises PubSubNotFoundError."""
+    from pubsub_python_sdk.errors import PubSubNotFoundError
+
+    bogus_subscriber = pubsub_client.get_subscriber(subscription_id=str(uuid.uuid4()))
+    try:
+        with pytest.raises(PubSubNotFoundError):
+            await bogus_subscriber.pull(max_messages=1)
+    finally:
+        await bogus_subscriber.close()
+
+
+@pytest.mark.integration
+async def test_ack_nack_messages_empty_list_is_noop(subscriber):
+    """Test that ack_messages/nack_messages are no-ops for an empty message list."""
+    acked_before = subscriber.messages_acked
+    nacked_before = subscriber.messages_nacked
+
+    result_ack = await subscriber.ack_messages([])
+    result_nack = await subscriber.nack_messages([])
+
+    assert result_ack is None
+    assert result_nack is None
+    assert subscriber.messages_acked == acked_before
+    assert subscriber.messages_nacked == nacked_before
+
+
+@pytest.mark.integration
+async def test_publish_calls_counter(publisher):
+    """Test that publish_calls increments once per publish() call."""
+    calls_before = publisher.publish_calls
+
+    await publisher.publish([PublishMessage.from_plain("counter-test-1")])
+    await publisher.publish([PublishMessage.from_plain("counter-test-2")])
+
+    assert publisher.publish_calls == calls_before + 2
