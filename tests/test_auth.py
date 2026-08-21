@@ -155,9 +155,7 @@ class TestGetToken:
         provider._token = "old-token"
         provider._expires_at = time.time() - 10
 
-        with patch.object(
-            provider, "_get_token_from_stackit", return_value=("new-token", 3600)
-        ):
+        with patch.object(provider, "_get_token_from_stackit", return_value=("new-token", 3600)):
             token = provider.get_token()
 
         assert token == "new-token"
@@ -168,9 +166,7 @@ class TestGetToken:
     def test_get_auth_header_uses_get_token(self):
         provider = StackitAuthProvider(AuthConfig())
 
-        with patch.object(
-            provider, "_get_token_from_stackit", return_value=("header-token", 3600)
-        ):
+        with patch.object(provider, "_get_token_from_stackit", return_value=("header-token", 3600)):
             header = provider.get_auth_header()
 
         assert header == {"Authorization": "Bearer header-token"}
