@@ -199,7 +199,7 @@ class StackitAuthProvider:
         Returns:
             Dictionary with the Authorization header key and token value.
         """
-        return {"Authorization": self.get_token()}
+        return {"Authorization": f"Bearer {self.get_token()}"}
 
 
 __all__ = [
