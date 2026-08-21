@@ -26,7 +26,7 @@ jobs:
           uv pip install -e .
 
       - name: Write service account key
-        run: echo "$SA_KEY" > sa-key.json
+        run: echo "${{ secrets.SA_KEY }}" > sa-key.json
 
       - name: Run integration tests
         env:

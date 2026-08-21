@@ -96,13 +96,14 @@ class StackitAuthProvider:
             sa_key_content = self.config.service_account_key
             sa_key_stripped = sa_key_content.strip() if sa_key_content else ""
 
+            if not sa_key_stripped:
+                raise ValueError("No service account key configured (received empty string)")
+
             if sa_key_stripped.startswith("{"):
                 sa_key_data = json_lib.loads(sa_key_stripped)
-            elif sa_key_stripped:
+            else:
                 with open(sa_key_stripped) as f:
                     sa_key_data = json_lib.loads(f.read())
-            else:
-                raise ValueError("No service account key configured")
 
             cred = sa_key_data.get("credentials", {})
 
