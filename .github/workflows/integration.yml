@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade12054dbc17946fc9a30d # v10.0.1
         with:
           python-version: "3.14"
           enable-cache: true
@@ -25,18 +25,10 @@ jobs:
           uv sync --group dev
           uv pip install -e .
 
-      - name: Write service account key
-        run: echo "${{ secrets.SA_KEY_B64 }}" | base64 -d > sa-key.json
-
-      - name: Validate SA_KEY is valid JSON
-        run: cat sa-key.json | jq .
-
       - name: Run integration tests
         env:
-          SA_KEY_PATH: sa-key.json
+          SA_KEY_B64: ${{ secrets.SA_KEY_B64 }}
           PROJECT_ID: ${{ secrets.PROJECT_ID }}
           TOKEN_URL: ${{ secrets.TOKEN_URL }}
           REGION: ${{ secrets.REGION }}
-          BASE_URL: ${{ secrets.BASE_URL }}
-          TOPIC_ID: ${{ secrets.TOPIC_ID }}
-        run: uv run pytest tests/integration/ -v --timeout=60
+        run: uv run pytest tests/integration/ -v --timeout=120

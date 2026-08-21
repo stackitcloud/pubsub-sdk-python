@@ -75,3 +75,82 @@ async def test_context_manager(publisher):
         assert isinstance(pub, PubSubPublisher)
         response = await pub.publish(messages)
         assert response.message_ids is not None
+
+
+@pytest.mark.integration
+async def test_publish_and_subscribe(subscriber, publisher):
+    """Test publishing a message and subscribing to it."""
+    # Publish a message
+    messages = [PublishMessage.from_plain("subscribe-test-message")]
+    response = await publisher.publish(messages)
+    assert response.message_ids is not None
+
+    # Pull the message from subscription
+    pulled_messages = await subscriber.pull(max_messages=1)
+    assert len(pulled_messages) >= 1
+    assert subscriber.messages_received >= 1
+
+
+@pytest.mark.integration
+async def test_ack_message(subscriber, publisher):
+    """Test acknowledging a message after pulling it."""
+    # Publish a message
+    messages = [PublishMessage.from_plain("ack-test-message")]
+    await publisher.publish(messages)
+
+    # Pull the message
+    pulled_messages = await subscriber.pull(max_messages=1)
+    assert len(pulled_messages) >= 1
+
+    # Ack the message
+    ack_ids = [msg.ack_id for msg in pulled_messages]
+    await subscriber.ack(ack_ids)
+    assert subscriber.messages_acked >= 1
+
+
+@pytest.mark.integration
+async def test_nack_message(subscriber, publisher):
+    """Test negatively acknowledging a message after pulling it."""
+    # Publish a message
+    messages = [PublishMessage.from_plain("nack-test-message")]
+    await publisher.publish(messages)
+
+    # Pull the message
+    pulled_messages = await subscriber.pull(max_messages=1)
+    assert len(pulled_messages) >= 1
+
+    # Nack the message
+    nack_ids = [msg.ack_id for msg in pulled_messages]
+    await subscriber.nack(nack_ids)
+    assert subscriber.messages_nacked >= 1
+
+
+@pytest.mark.integration
+async def test_ack_messages_helper(subscriber, publisher):
+    """Test the ack_messages helper method."""
+    messages = [PublishMessage.from_plain("ack-helpers-test")]
+    await publisher.publish(messages)
+
+    pulled = await subscriber.pull(max_messages=1)
+    await subscriber.ack_messages(pulled)
+    assert subscriber.messages_acked >= 1
+
+
+@pytest.mark.integration
+async def test_nack_messages_helper(subscriber, publisher):
+    """Test the nack_messages helper method."""
+    messages = [PublishMessage.from_plain("nack-helpers-test")]
+    await publisher.publish(messages)
+
+    pulled = await subscriber.pull(max_messages=1)
+    await subscriber.nack_messages(pulled)
+    assert subscriber.messages_nacked >= 1
+
+
+@pytest.mark.integration
+async def test_context_manager_subscriber(subscriber):
+    """Test that the subscriber works as a context manager."""
+    from pubsub_python_sdk.subscriber import PubSubSubscriber
+
+    async with subscriber as sub:
+        assert isinstance(sub, PubSubSubscriber)
