@@ -31,4 +31,4 @@ jobs:
           PROJECT_ID: ${{ secrets.PROJECT_ID }}
           TOKEN_URL: ${{ secrets.TOKEN_URL }}
           REGION: ${{ secrets.REGION }}
-        run: uv run pytest tests/integration/ -v --timeout=120
+        run: uv run pytest tests/integration/ -v --timeout=700

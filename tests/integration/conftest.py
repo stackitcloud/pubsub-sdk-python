@@ -128,9 +128,8 @@ def _create_subscription(
         return subscription["id"]
 
 
-@with_retry
 def _get_resource(url: str, auth_header: dict[str, str]) -> dict:
-    """Fetch a topic or subscription resource, retrying on transient network errors."""
+    """Fetch a topic or subscription resource."""
     with httpx.Client() as client:
         response = client.get(
             url,
@@ -169,7 +168,15 @@ def _wait_for_resource_active(
         )
 
     while time.time() - start_time < timeout:
-        resource = _get_resource(url, auth_header)
+        try:
+            resource = _get_resource(url, auth_header)
+        except httpx.TransportError as exc:
+            # The resource may not be reachable yet right after creation
+            # (e.g. backend routing not provisioned) - keep polling until timeout.
+            print(f"{resource_type} {resource_id} not reachable yet, retrying: {exc}")
+            time.sleep(poll_interval)
+            continue
+
         state = resource.get("state")
 
         if state == "active":
