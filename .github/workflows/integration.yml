@@ -26,7 +26,7 @@ jobs:
           uv pip install -e .
 
       - name: Write service account key
-        run: printf '%s' "${{ secrets.SA_KEY }}" > sa-key.json
+        run: printf '%s' "${{ secrets.SA_KEY }}" | jq -c . > sa-key.json
 
       - name: Validate SA_KEY is valid JSON
         run: cat sa-key.json | jq .
