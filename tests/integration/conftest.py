@@ -20,6 +20,7 @@ import pytest
 
 from pubsub_python_sdk.auth import AuthConfig
 from pubsub_python_sdk.client import PubSubClient
+from pubsub_python_sdk.retry import with_retry
 
 SA_KEY_PATH = "sa-key.json"
 SA_EMAIL = "break-test-jennifer-qzj3sci8@sa.stackit.cloud"
@@ -60,6 +61,7 @@ def _create_auth_header(auth_config: AuthConfig) -> dict[str, str]:
     return provider.get_auth_header()
 
 
+@with_retry
 def _create_topic(
     control_plane_url: str,
     project_id: str,
@@ -90,6 +92,7 @@ def _create_topic(
         return topic["id"]
 
 
+@with_retry
 def _create_subscription(
     control_plane_url: str,
     project_id: str,
@@ -125,6 +128,19 @@ def _create_subscription(
         return subscription["id"]
 
 
+@with_retry
+def _get_resource(url: str, auth_header: dict[str, str]) -> dict:
+    """Fetch a topic or subscription resource, retrying on transient network errors."""
+    with httpx.Client() as client:
+        response = client.get(
+            url,
+            headers={**auth_header, "Content-Type": "application/json"},
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return response.json()
+
+
 def _wait_for_resource_active(
     control_plane_url: str,
     project_id: str,
@@ -153,26 +169,20 @@ def _wait_for_resource_active(
         )
 
     while time.time() - start_time < timeout:
-        with httpx.Client() as client:
-            response = client.get(
-                url,
-                headers={**auth_header, "Content-Type": "application/json"},
-                timeout=30.0,
-            )
-            response.raise_for_status()
-            resource = response.json()
-            state = resource.get("state")
+        resource = _get_resource(url, auth_header)
+        state = resource.get("state")
 
-            if state == "active":
-                return
-            if state == "deleting":
-                raise RuntimeError(f"{resource_type} entered deleting state: {resource_id}")
+        if state == "active":
+            return
+        if state == "deleting":
+            raise RuntimeError(f"{resource_type} entered deleting state: {resource_id}")
 
         time.sleep(poll_interval)
 
     raise TimeoutError(f"{resource_type} {resource_id} did not become active within {timeout}s")
 
 
+@with_retry
 def _delete_topic(
     control_plane_url: str,
     project_id: str,
@@ -194,6 +204,7 @@ def _delete_topic(
             response.raise_for_status()
 
 
+@with_retry
 def _list_subscriptions(
     control_plane_url: str,
     project_id: str,
@@ -219,6 +230,7 @@ def _list_subscriptions(
         return data.get("subscriptions", [])
 
 
+@with_retry
 def _delete_subscription(
     control_plane_url: str,
     project_id: str,
@@ -244,6 +256,7 @@ def _delete_subscription(
             response.raise_for_status()
 
 
+@with_retry
 def _grant_topic_publisher_access(
     control_plane_url: str,
     project_id: str,
@@ -271,6 +284,7 @@ def _grant_topic_publisher_access(
         response.raise_for_status()
 
 
+@with_retry
 def _grant_subscription_subscriber_access(
     control_plane_url: str,
     project_id: str,
