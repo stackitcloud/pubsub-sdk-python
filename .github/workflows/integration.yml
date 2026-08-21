@@ -28,6 +28,9 @@ jobs:
       - name: Write service account key
         run: echo "${{ secrets.SA_KEY }}" > sa-key.json
 
+      - name: Validate SA_KEY is valid JSON
+        run: cat sa-key.json | jq .
+
       - name: Run integration tests
         env:
           SA_KEY_PATH: sa-key.json
