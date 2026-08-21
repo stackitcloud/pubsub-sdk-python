@@ -112,7 +112,7 @@ class PubSubPublisher:
         Raises:
             PubSubValidationError: On 400/413 errors.
             PubSubNotFoundError: On 404 errors.
-            PubSubAuthenticationError: On 401 errors.
+            PubSubAuthenticationError: On 401/403 errors.
             PubSubRetryError: When all retries are exhausted for transient errors.
         """
         last_exception: Exception | None = None
@@ -151,6 +151,10 @@ class PubSubPublisher:
                     from pubsub_sdk_python.errors import PubSubAuthenticationError
 
                     raise PubSubAuthenticationError(f"Unauthorized: {response.text}")
+                if response.status_code == 403:
+                    from pubsub_sdk_python.errors import PubSubAuthenticationError
+
+                    raise PubSubAuthenticationError(f"Forbidden: {response.text}")
 
                 # Transient error - may retry
                 if _is_retryable_status(response.status_code):

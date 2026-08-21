@@ -229,13 +229,17 @@ async def test_pull_with_custom_parameters(subscriber, publisher):
 
 
 @pytest.mark.integration
-async def test_pull_from_nonexistent_subscription_raises_not_found(pubsub_client):
-    """Test that pulling from a nonexistent subscription raises PubSubNotFoundError."""
-    from pubsub_sdk_python.errors import PubSubNotFoundError
+async def test_pull_from_nonexistent_subscription_raises_error(pubsub_client):
+    """Test that pulling from a nonexistent subscription raises PubSubAuthenticationError.
+
+    The API checks access before existence, so an unrecognized subscription ID
+    returns 403 Forbidden rather than 404 Not Found.
+    """
+    from pubsub_sdk_python.errors import PubSubAuthenticationError
 
     bogus_subscriber = pubsub_client.get_subscriber(subscription_id=str(uuid.uuid4()))
     try:
-        with pytest.raises(PubSubNotFoundError):
+        with pytest.raises(PubSubAuthenticationError):
             await bogus_subscriber.pull(max_messages=1)
     finally:
         await bogus_subscriber.close()

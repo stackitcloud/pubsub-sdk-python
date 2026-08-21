@@ -43,6 +43,7 @@ auth_config = AuthConfig(
 import asyncio
 from pubsub_sdk_python import PubSubClient, PublishMessage
 
+
 async def main():
     client = PubSubClient(topic_id="<topic-id>", auth_config=auth_config)
 
@@ -56,6 +57,7 @@ async def main():
             print(msg.text)  # base64-decoded payload
         await subscriber.ack([msg.ack_id for msg in messages])
         # or: await subscriber.ack_messages(messages)
+
 
 asyncio.run(main())
 ```
@@ -76,7 +78,7 @@ All exceptions subclass `PubSubError`:
 |-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `PubSubValidationError`     | Bad request (HTTP 400/413), or local validation (empty message list, >100 messages, `max_messages`/`long_pull_duration_ms` out of range, empty ack/nack list) |
 | `PubSubNotFoundError`       | HTTP 404                                                                                                                                                      |
-| `PubSubAuthenticationError` | HTTP 401, or token acquisition failure                                                                                                                        |
+| `PubSubAuthenticationError` | HTTP 401/403, or token acquisition failure                                                                                                                    |
 | `PubSubServerError`         | HTTP 5xx (transient - triggers a retry, see below)                                                                                                            |
 | `PubSubRetryError`          | All retry attempts exhausted; `.causes` holds the underlying exceptions                                                                                       |
 | `PubSubTimeoutError`        | Request timed out (also a `TimeoutError`)                                                                                                                     |
