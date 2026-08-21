@@ -6,7 +6,14 @@ This SDK covers the **data plane only** (publish, pull, ack, nack). Creating/del
 
 ## Install
 
-Not published to PyPI yet. Install from source with [uv](https://docs.astral.sh/uv/):
+Not published to PyPI yet — every GitHub Release publishes `pubsub-sdk-python` to PyPI automatically (see `.github/workflows/release.yml`), so once a release is cut:
+
+```bash
+pip install pubsub-sdk-python
+# or: uv add pubsub-sdk-python
+```
+
+Until then, install from source with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv sync --group dev
