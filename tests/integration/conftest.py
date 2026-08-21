@@ -23,12 +23,12 @@ from pubsub_python_sdk.client import PubSubClient
 def _load_sa_key() -> str:
     """Load the SA_KEY from environment or file."""
     sa_key = os.environ.get("SA_KEY")
-    if sa_key:
-        return sa_key
+    if sa_key and sa_key.strip():
+        return sa_key.strip()
     sa_key_path = os.environ.get("SA_KEY_PATH", "sa-key.json")
     path = Path(sa_key_path)
     if path.exists():
-        return path.read_text()
+        return path.read_text().strip()
     raise ValueError("SA_KEY not found in environment or as file")
 
 

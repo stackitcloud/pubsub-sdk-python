@@ -94,11 +94,12 @@ class StackitAuthProvider:
                 KeyAuth._KeyAuth__patched = True
 
             sa_key_content = self.config.service_account_key
+            sa_key_stripped = sa_key_content.strip() if sa_key_content else ""
 
-            if sa_key_content and sa_key_content.strip().startswith("{"):
-                sa_key_data = json_lib.loads(sa_key_content)
-            elif sa_key_content:
-                with open(sa_key_content) as f:
+            if sa_key_stripped.startswith("{"):
+                sa_key_data = json_lib.loads(sa_key_stripped)
+            elif sa_key_stripped:
+                with open(sa_key_stripped) as f:
                     sa_key_data = json_lib.loads(f.read())
             else:
                 raise ValueError("No service account key configured")
