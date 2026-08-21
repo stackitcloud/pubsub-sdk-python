@@ -10,7 +10,6 @@ Requires the following secrets to be set:
 from __future__ import annotations
 
 import base64
-import json
 import os
 import time
 from pathlib import Path
@@ -22,7 +21,6 @@ from pubsub_python_sdk.auth import AuthConfig
 from pubsub_python_sdk.client import PubSubClient
 
 SA_KEY_PATH = "sa-key.json"
-TOPIC_LIST_PATH = "integration-topic-list.json"
 SA_EMAIL = "break-test-jennifer-qzj3sci8@sa.stackit.cloud"
 
 
@@ -51,24 +49,6 @@ def _get_control_plane_url() -> str:
         return url
     region = os.environ.get("REGION", "eu01")
     return f"https://pubsub-dev.api.{region}.qa.stackit.cloud"
-
-
-def _load_topic_list() -> list[str]:
-    """Load existing topic IDs from the topic list file."""
-    path = Path(TOPIC_LIST_PATH)
-    if path.exists():
-        try:
-            data = json.loads(path.read_text())
-            return data.get("topicIds", [])
-        except (json.JSONDecodeError, KeyError):
-            return []
-    return []
-
-
-def _save_topic_list(topic_ids: list[str]) -> None:
-    """Save topic IDs to the topic list file."""
-    path = Path(TOPIC_LIST_PATH)
-    path.write_text(json.dumps({"topicIds": topic_ids}, indent=2))
 
 
 def _create_auth_header(auth_config: AuthConfig) -> dict[str, str]:
@@ -209,7 +189,6 @@ def _delete_topic(
             params={"force": True},
             timeout=30.0,
         )
-        # 202 is expected, 404 means already deleted
         if response.status_code not in (202, 404):
             response.raise_for_status()
 
@@ -248,7 +227,6 @@ def _delete_subscription(
             headers={**auth_header, "Content-Type": "application/json"},
             timeout=30.0,
         )
-        # 202 is expected, 404 means already deleted
         if response.status_code not in (202, 404):
             response.raise_for_status()
 
@@ -300,6 +278,24 @@ def _grant_subscription_subscriber_access(
         response.raise_for_status()
 
 
+def _purge_topic_data_plane(
+    data_plane_url: str,
+    topic_id: str,
+    auth_header: dict[str, str],
+) -> None:
+    """Purge all messages from a topic via the data plane API."""
+    url = f"{data_plane_url}/v1alpha/purge"
+
+    with httpx.Client() as client:
+        response = client.post(
+            url,
+            json={},
+            headers={**auth_header, "Content-Type": "application/json"},
+            timeout=30.0,
+        )
+        response.raise_for_status()
+
+
 @pytest.fixture(scope="session")
 def sa_key() -> str:
     """Load the service account key."""
@@ -345,85 +341,40 @@ def topic_id(
     region: str,
     auth_config: AuthConfig,
 ):
-    """Create a topic once, wait for it to be active, and reuse for all tests."""
+    """Create a topic once for all tests in this run, then delete it."""
     auth_header = _create_auth_header(auth_config)
 
-    # Try to load existing topic ID
-    existing_ids = _load_topic_list()
-    if existing_ids:
-        new_topic_id = existing_ids[0]
-        print(f"Reusing existing topic: {new_topic_id}")
+    new_topic_id = _create_topic(
+        control_plane_url=control_plane_url,
+        project_id=project_id,
+        region=region,
+        auth_header=auth_header,
+        display_name="sdk-integration-test-shared",
+    )
+    print(f"Created topic: {new_topic_id}")
 
-        # Verify topic is active
-        try:
-            _wait_for_resource_active(
-                control_plane_url=control_plane_url,
-                project_id=project_id,
-                region=region,
-                resource_type="topics",
-                resource_id=new_topic_id,
-                auth_header=auth_header,
-                poll_interval=10.0,
-                timeout=60.0,
-            )
-            print(f"Topic {new_topic_id} is active")
-        except TimeoutError:
-            # Topic is not active, delete and create new
-            print(f"Topic {new_topic_id} not active, creating new topic")
-            try:
-                _delete_topic(
-                    control_plane_url=control_plane_url,
-                    project_id=project_id,
-                    region=region,
-                    topic_id=new_topic_id,
-                    auth_header=auth_header,
-                )
-            except Exception:
-                pass
-            existing_ids = []
+    _wait_for_resource_active(
+        control_plane_url=control_plane_url,
+        project_id=project_id,
+        region=region,
+        resource_type="topics",
+        resource_id=new_topic_id,
+        auth_header=auth_header,
+    )
+    print(f"Topic {new_topic_id} is active")
 
-    # Create new topic if none exists
-    if not existing_ids:
-        new_topic_id = _create_topic(
-            control_plane_url=control_plane_url,
-            project_id=project_id,
-            region=region,
-            auth_header=auth_header,
-            display_name="sdk-integration-test-shared",
-        )
-        print(f"Created topic: {new_topic_id}")
-
-        # Wait for topic to be active
-        _wait_for_resource_active(
-            control_plane_url=control_plane_url,
-            project_id=project_id,
-            region=region,
-            resource_type="topics",
-            resource_id=new_topic_id,
-            auth_header=auth_header,
-        )
-        print(f"Topic {new_topic_id} is active")
-
-        # Grant publisher access to the service account
-        _grant_topic_publisher_access(
-            control_plane_url=control_plane_url,
-            project_id=project_id,
-            region=region,
-            topic_id=new_topic_id,
-            auth_header=auth_header,
-            email=SA_EMAIL,
-        )
-        print(f"Granted publisher access for {SA_EMAIL} on topic {new_topic_id}")
-
-        # Save topic ID for reuse
-        _save_topic_list([new_topic_id])
-
-    else:
-        new_topic_id = existing_ids[0]
+    _grant_topic_publisher_access(
+        control_plane_url=control_plane_url,
+        project_id=project_id,
+        region=region,
+        topic_id=new_topic_id,
+        auth_header=auth_header,
+        email=SA_EMAIL,
+    )
+    print(f"Granted publisher access for {SA_EMAIL} on topic {new_topic_id}")
 
     yield new_topic_id
 
-    # Clean up: delete topic (cascades to subscriptions)
     print(f"Deleting shared topic: {new_topic_id}")
     try:
         _delete_topic(
@@ -473,7 +424,7 @@ async def publisher(pubsub_client: PubSubClient):
 
 
 @pytest.fixture(scope="session")
-def subscriber(
+def subscription_id(
     control_plane_url: str,
     project_id: str,
     region: str,
@@ -483,7 +434,6 @@ def subscriber(
     """Create a subscription once and reuse for all tests that need it."""
     auth_header = _create_auth_header(auth_config)
 
-    # Check if subscription already exists
     existing_subs = _list_subscriptions(
         control_plane_url=control_plane_url,
         project_id=project_id,
@@ -493,10 +443,9 @@ def subscriber(
     )
 
     if existing_subs:
-        sub_id = existing_subs[0]["name"].split("/")[-1]
+        sub_id = existing_subs[0]["id"]
         print(f"Reusing existing subscription: {sub_id}")
 
-        # Verify subscription is active
         try:
             _wait_for_resource_active(
                 control_plane_url=control_plane_url,
@@ -511,7 +460,6 @@ def subscriber(
             )
             print(f"Subscription {sub_id} is active")
         except TimeoutError:
-            # Subscription not active, delete and create new
             print(f"Subscription {sub_id} not active, creating new subscription")
             try:
                 _delete_subscription(
@@ -537,7 +485,6 @@ def subscriber(
         )
         print(f"Created subscription: {sub_id}")
 
-        # Wait for subscription to be active
         _wait_for_resource_active(
             control_plane_url=control_plane_url,
             project_id=project_id,
@@ -549,7 +496,6 @@ def subscriber(
         )
         print(f"Subscription {sub_id} is active")
 
-        # Grant subscriber access
         _grant_subscription_subscriber_access(
             control_plane_url=control_plane_url,
             project_id=project_id,
@@ -562,43 +508,29 @@ def subscriber(
         print(f"Granted subscriber access for {SA_EMAIL} on subscription {sub_id}")
 
     else:
-        sub_id = existing_subs[0]["name"].split("/")[-1]
+        sub_id = existing_subs[0]["id"]
 
     yield sub_id
 
-    # Note: subscription is deleted when topic is deleted (cascade)
+
+@pytest.fixture()
+async def subscriber(pubsub_client: PubSubClient, subscription_id: str):
+    """Create a PubSubSubscriber instance for each test using the shared subscription."""
+    sub = pubsub_client.get_subscriber(subscription_id=subscription_id)
+    yield sub
+    await sub.close()
 
 
 @pytest.fixture(autouse=True)
-def cleanup_between_tests(
-    control_plane_url: str,
-    project_id: str,
-    region: str,
-    topic_id: str,
-    auth_config: AuthConfig,
+async def purge_between_tests(
+    pubsub_client: PubSubClient,
+    auth_header: dict[str, str],
 ):
-    """Delete any leftover subscriptions between tests."""
+    """Purge topic messages between tests using the data plane API."""
     yield
 
-    # Delete any subscriptions created during the test (they're deleted with the topic at the end)
     try:
-        existing_subs = _list_subscriptions(
-            control_plane_url=control_plane_url,
-            project_id=project_id,
-            region=region,
-            topic_id=topic_id,
-            auth_header=_create_auth_header(auth_config),
-        )
-        for sub in existing_subs:
-            sub_id = sub["name"].split("/")[-1]
-            _delete_subscription(
-                control_plane_url=control_plane_url,
-                project_id=project_id,
-                region=region,
-                topic_id=topic_id,
-                subscription_id=sub_id,
-                auth_header=_create_auth_header(auth_config),
-            )
-            print(f"Deleted leftover subscription: {sub_id}")
+        await pubsub_client.get_publisher().purge_topic()
+        print(f"Purged topic: {pubsub_client.topic_id}")
     except Exception as e:
-        print(f"Failed to cleanup subscriptions: {e}")
+        print(f"Failed to purge topic: {e}")
