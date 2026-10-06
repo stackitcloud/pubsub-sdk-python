@@ -7,6 +7,7 @@ import sys
 import time
 from unittest.mock import MagicMock, patch
 
+import jwt
 import pytest
 
 from pubsub_sdk_python.auth import AuthConfig, StackitAuthProvider
@@ -31,12 +32,15 @@ SAMPLE_SA_KEY = {
 }
 
 
-def _mock_authorization_cls(access_token: str) -> MagicMock:
-    """Build a mock standing in for stackit.core.authorization.Authorization."""
-    mock_auth_method = MagicMock()
-    mock_auth_method.access_token = access_token
+def _make_jwt(lifetime: float = 900) -> str:
+    """Build an unsigned-verifiable JWT that expires `lifetime` seconds from now."""
+    return jwt.encode({"exp": int(time.time() + lifetime)}, "secret", algorithm="HS256")
+
+
+def _mock_key_auth_cls(access_token: str) -> MagicMock:
+    """Build a mock standing in for stackit.core.auth_methods.key_auth.KeyAuth."""
     mock_instance = MagicMock()
-    mock_instance._Authorization__get_authentication.return_value = mock_auth_method
+    mock_instance.access_token = access_token
     return MagicMock(return_value=mock_instance)
 
 
@@ -47,14 +51,15 @@ class TestGetTokenFromStackit:
         config = AuthConfig(service_account_key=json.dumps(SAMPLE_SA_KEY))
         provider = StackitAuthProvider(config)
 
+        access_token = _make_jwt(900)
         with patch(
-            "stackit.core.authorization.Authorization",
-            _mock_authorization_cls("token-abc"),
+            "stackit.core.auth_methods.key_auth.KeyAuth",
+            _mock_key_auth_cls(access_token),
         ):
             token, expires_in = provider._get_token_from_stackit()
 
-        assert token == "token-abc"
-        assert expires_in == 3600
+        assert token == access_token
+        assert 895 < expires_in <= 900
 
     def test_success_with_key_file_path(self, tmp_path):
         key_path = tmp_path / "sa-key.json"
@@ -62,14 +67,35 @@ class TestGetTokenFromStackit:
         config = AuthConfig(service_account_key=str(key_path))
         provider = StackitAuthProvider(config)
 
+        access_token = _make_jwt(900)
         with patch(
-            "stackit.core.authorization.Authorization",
-            _mock_authorization_cls("token-file"),
+            "stackit.core.auth_methods.key_auth.KeyAuth",
+            _mock_key_auth_cls(access_token),
         ):
             token, expires_in = provider._get_token_from_stackit()
 
-        assert token == "token-file"
-        assert expires_in == 3600
+        assert token == access_token
+        assert 895 < expires_in <= 900
+
+    def test_reuses_key_auth_and_forces_refresh(self):
+        config = AuthConfig(service_account_key=json.dumps(SAMPLE_SA_KEY))
+        provider = StackitAuthProvider(config)
+        key_auth_cls = _mock_key_auth_cls(_make_jwt(900))
+        refreshed_token = _make_jwt(1800)
+
+        def _refresh() -> None:
+            key_auth_cls.return_value.access_token = refreshed_token
+
+        key_auth_cls.return_value._KeyAuth__refresh_token.side_effect = _refresh
+
+        with patch("stackit.core.auth_methods.key_auth.KeyAuth", key_auth_cls):
+            provider._get_token_from_stackit()
+            token, expires_in = provider._get_token_from_stackit()
+
+        key_auth_cls.assert_called_once()
+        key_auth_cls.return_value._KeyAuth__refresh_token.assert_called_once()
+        assert token == refreshed_token
+        assert 1795 < expires_in <= 1800
 
     def test_empty_key_raises_auth_error(self):
         config = AuthConfig(service_account_key="   ")

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -38,6 +40,8 @@ class StackitAuthProvider:
         config (AuthConfig): The authentication configuration.
         _token (str | None): The current access token (cached until expiry).
         _expires_at (float): Unix timestamp when the current token expires.
+        _key_auth (KeyAuth | None): Long-lived KeyAuth instance. Created once per provider,
+            since each KeyAuth starts background threads that are never stopped.
     """
 
     def __init__(self, config: AuthConfig):
@@ -45,6 +49,8 @@ class StackitAuthProvider:
         self._token: str | None = None
         self._expires_at: float = 0.0
         self._tokens: list[dict[str, Any]] = []
+        self._key_auth: Any = None
+        self._lock = threading.Lock()
 
     def _get_token_from_stackit(self) -> tuple[str, float]:
         """Fetch a token from STACKIT authorization service.
@@ -59,15 +65,7 @@ class StackitAuthProvider:
             PubSubAuthenticationError: If authentication fails.
         """
         try:
-            import json as json_lib
-            from datetime import datetime
-
             from stackit.core.auth_methods.key_auth import KeyAuth
-            from stackit.core.authorization import (
-                Authorization,
-                Configuration,
-                ServiceAccountKey,
-            )
 
             # Patch KeyAuth to handle missing refresh_token
             if not hasattr(KeyAuth, "_KeyAuth__patched"):
@@ -93,53 +91,17 @@ class StackitAuthProvider:
                 KeyAuth._KeyAuth__fetch_token_from_endpoint = _patched_fetch
                 KeyAuth._KeyAuth__patched = True
 
-            sa_key_content = self.config.service_account_key
-            sa_key_stripped = sa_key_content.strip() if sa_key_content else ""
+            import jwt
 
-            if not sa_key_stripped:
-                raise ValueError("No service account key configured (received empty string)")
-
-            if sa_key_stripped.startswith("{"):
-                sa_key_data = json_lib.loads(sa_key_stripped)
+            if self._key_auth is None:
+                self._key_auth = self._create_key_auth(KeyAuth)
             else:
-                with open(sa_key_stripped) as f:
-                    sa_key_data = json_lib.loads(f.read())
+                # KeyAuth only refreshes after the token has already expired, so force it.
+                self._key_auth._KeyAuth__refresh_token()
 
-            cred = sa_key_data.get("credentials", {})
-
-            credentials_dict = {
-                "active": sa_key_data.get("active", True),
-                "createdAt": datetime.fromisoformat(
-                    sa_key_data["createdAt"].replace("Z", "+00:00")
-                ),
-                "credentials": {
-                    "aud": cred.get("aud"),
-                    "iss": cred.get("iss"),
-                    "kid": cred.get("kid"),
-                    "sub": cred.get("sub"),
-                    "privateKey": cred.get("privateKey"),
-                    "tokenEndpoint": cred.get("tokenEndpoint"),
-                },
-                "id": sa_key_data["id"],
-                "keyAlgorithm": sa_key_data.get("keyAlgorithm"),
-                "keyOrigin": sa_key_data.get("keyOrigin"),
-                "keyType": sa_key_data.get("keyType"),
-                "publicKey": sa_key_data.get("publicKey"),
-            }
-
-            credentials = ServiceAccountKey.model_validate(credentials_dict)
-
-            config = Configuration(
-                service_account_key=credentials,
-                custom_token_endpoint=cred.get("tokenEndpoint", self.config.token_endpoint),
-            )
-
-            auth = Authorization(config)
-            auth.service_account_key = credentials
-            auth.auth_method = auth._Authorization__get_authentication()
-
-            token = auth.auth_method.access_token
-            return token, 3600
+            token = self._key_auth.access_token
+            claims = jwt.decode(token, options={"verify_signature": False})
+            return token, claims["exp"] - time.time()
 
         except ImportError:
             logger.warning(
@@ -151,6 +113,55 @@ class StackitAuthProvider:
             from pubsub_sdk_python.errors import PubSubAuthenticationError
 
             raise PubSubAuthenticationError(f"Failed to obtain STACKIT token: {exc}") from exc
+
+    def _create_key_auth(self, key_auth_cls: Any) -> Any:
+        """Parse the configured service account key and build a KeyAuth instance.
+
+        Args:
+            key_auth_cls: The KeyAuth class to instantiate.
+
+        Returns:
+            A KeyAuth instance holding a freshly fetched access token.
+        """
+        import json as json_lib
+        from datetime import datetime
+
+        from stackit.core.auth_methods.key_auth import ServiceAccountKey
+
+        sa_key_content = self.config.service_account_key
+        sa_key_stripped = sa_key_content.strip() if sa_key_content else ""
+
+        if not sa_key_stripped:
+            raise ValueError("No service account key configured (received empty string)")
+
+        if sa_key_stripped.startswith("{"):
+            sa_key_data = json_lib.loads(sa_key_stripped)
+        else:
+            with open(sa_key_stripped) as f:
+                sa_key_data = json_lib.loads(f.read())
+
+        cred = sa_key_data.get("credentials", {})
+
+        credentials_dict = {
+            "active": sa_key_data.get("active", True),
+            "createdAt": datetime.fromisoformat(sa_key_data["createdAt"].replace("Z", "+00:00")),
+            "credentials": {
+                "aud": cred.get("aud"),
+                "iss": cred.get("iss"),
+                "kid": cred.get("kid"),
+                "sub": cred.get("sub"),
+                "privateKey": cred.get("privateKey"),
+            },
+            "id": sa_key_data["id"],
+            "keyAlgorithm": sa_key_data.get("keyAlgorithm"),
+            "keyOrigin": sa_key_data.get("keyOrigin"),
+            "keyType": sa_key_data.get("keyType"),
+            "publicKey": sa_key_data.get("publicKey"),
+        }
+
+        credentials = ServiceAccountKey.model_validate(credentials_dict)
+        token_endpoint = cred.get("tokenEndpoint", self.config.token_endpoint)
+        return key_auth_cls(credentials, token_endpoint)
 
     def _get_fallback_token(self) -> tuple[str, float]:
         """Fallback token acquisition when stackit.authorization is unavailable.
@@ -174,24 +185,23 @@ class StackitAuthProvider:
         Returns:
             The access token string suitable for the Authorization header.
         """
-        import time as _time
+        with self._lock:
+            # Check if we have a cached valid token
+            if self._token and time.time() < self._expires_at - 60:  # 60s buffer
+                return self._token
 
-        # Check if we have a cached valid token
-        if self._token and _time.time() < self._expires_at - 60:  # 60s buffer
-            return self._token
-
-        # Fetch a new token
-        token, expires_in = self._get_token_from_stackit()
-        self._token = token
-        self._expires_at = _time.time() + expires_in
-        self._tokens.append(
-            {
-                "token": token,
-                "expires_at": self._expires_at,
-                "issued_at": _time.time(),
-            }
-        )
-        return token
+            # Fetch a new token
+            token, expires_in = self._get_token_from_stackit()
+            self._token = token
+            self._expires_at = time.time() + expires_in
+            self._tokens.append(
+                {
+                    "token": token,
+                    "expires_at": self._expires_at,
+                    "issued_at": time.time(),
+                }
+            )
+            return token
 
     def get_auth_header(self) -> dict[str, str]:
         """Get the Authorization header value.
