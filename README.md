@@ -48,8 +48,7 @@ async def main():
     client = PubSubClient(topic_id="<topic-id>", auth_config=auth_config)
 
     async with client.get_publisher() as publisher:
-        response = await publisher.publish([PublishMessage.from_plain("hello")])
-        print(response.message_ids)
+        await publisher.publish([PublishMessage.from_plain("hello")])
 
     async with client.get_subscriber(subscription_id="<subscription-id>") as subscriber:
         messages = await subscriber.pull(max_messages=10)

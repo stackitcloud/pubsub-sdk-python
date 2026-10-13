@@ -12,7 +12,7 @@ from pubsub_sdk_python.errors import (
     PubSubServerError,
     PubSubValidationError,
 )
-from pubsub_sdk_python.models import PublishMessage, PublishMessageResponse
+from pubsub_sdk_python.models import PublishMessage
 from pubsub_sdk_python.publisher import PubSubPublisher
 
 
@@ -59,9 +59,8 @@ class TestPublisherPublish:
         """Helper to create a publisher with a mocked HTTP client."""
         if response is None:
             response = MagicMock(spec=httpx.Response)
-            response.status_code = 200
-            response.json.return_value = {"messageIds": [1, 2]}
-            response.text = "OK"
+            response.status_code = 204
+            response.text = ""
 
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.request = AsyncMock(return_value=response)
@@ -82,8 +81,7 @@ class TestPublisherPublish:
         ]
         result = await publisher.publish(messages)
 
-        assert isinstance(result, PublishMessageResponse)
-        assert result.message_ids == [1, 2]
+        assert result is None
         assert publisher.messages_sent == 2
         assert publisher.publish_calls == 1
 
@@ -113,15 +111,16 @@ class TestPublisherPublish:
         publisher = self._make_publisher(auth_provider)
         messages = [PublishMessage.from_plain(f"msg-{i}") for i in range(5)]
 
-        responses = await publisher.publish_batch(messages, batch_size=2)
+        result = await publisher.publish_batch(messages, batch_size=2)
 
-        assert len(responses) == 3  # 5 messages / batch of 2 = 3 batches
+        assert result is None
+        assert publisher.messages_sent == 5
         assert publisher.publish_calls == 3
 
     async def test_publish_batch_empty(self, auth_provider):
         publisher = self._make_publisher(auth_provider)
-        responses = await publisher.publish_batch([])
-        assert responses == []
+        result = await publisher.publish_batch([])
+        assert result is None
 
     async def test_publish_500_triggers_retry(self, auth_provider):
         """Test that 500 errors trigger retry behavior."""
@@ -130,9 +129,8 @@ class TestPublisherPublish:
         error_response.text = "Service Unavailable"
 
         ok_response = MagicMock(spec=httpx.Response)
-        ok_response.status_code = 200
-        ok_response.json.return_value = {"messageIds": [42]}
-        ok_response.text = "OK"
+        ok_response.status_code = 204
+        ok_response.text = ""
 
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         # Fail twice, then succeed
@@ -159,7 +157,7 @@ class TestPublisherPublish:
         )
 
         result = await publisher.publish([PublishMessage.from_plain("test")])
-        assert result.message_ids == [42]
+        assert result is None
         assert mock_client.request.call_count == 3
 
     async def test_publish_exhausts_retries(self, auth_provider):

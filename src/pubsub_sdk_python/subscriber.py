@@ -276,7 +276,6 @@ class PubSubSubscriber:
         messages: list[Message] = []
         for raw in raw_messages:
             msg = Message(
-                id=raw["id"],
                 ack_id=raw["ackId"],
                 data=raw["data"],
                 create_time=_parse_datetime(raw["createTime"]),

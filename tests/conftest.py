@@ -39,9 +39,8 @@ def mock_http_client():
     """Create a mock async HTTP client."""
     client = AsyncMock(spec=httpx.AsyncClient)
     response = MagicMock(spec=httpx.Response)
-    response.status_code = 200
-    response.json.return_value = {"messageIds": [1, 2, 3]}
-    response.text = "OK"
+    response.status_code = 204
+    response.text = ""
     client.request = AsyncMock(return_value=response)
     return client
 
@@ -50,9 +49,8 @@ def mock_http_client():
 def mock_response():
     """Create a mock HTTP response."""
     response = MagicMock(spec=httpx.Response)
-    response.status_code = 200
-    response.json.return_value = {"messageIds": [1, 2, 3]}
-    response.text = "OK"
+    response.status_code = 204
+    response.text = ""
     return response
 
 
@@ -83,14 +81,12 @@ def sample_pull_messages():
     return {
         "messages": [
             {
-                "id": 1,
                 "ackId": "ack-1",
                 "data": "SGVsbG8sIFdvcmxkIQ==",
                 "createTime": "2024-01-01T00:00:00Z",
                 "deliveryAttempts": 1,
             },
             {
-                "id": 2,
                 "ackId": "ack-2",
                 "data": "U2Vjb25kIG1lc3NhZ2U=",
                 "createTime": "2024-01-01T00:01:00Z",

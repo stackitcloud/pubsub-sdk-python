@@ -114,8 +114,8 @@ async def main() -> None:
 
     try:
         async with client.get_publisher() as publisher:
-            response = await publisher.publish(messages)
-            print(f"Published {len(messages)} message(s); assigned ids={response.message_ids}")
+            await publisher.publish(messages)
+            print(f"Published {len(messages)} message(s) successfully.")
     except PubSubValidationError as exc:
         # Bad request (HTTP 400/413) or local validation, e.g. an empty or
         # oversized message batch.

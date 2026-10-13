@@ -20,7 +20,6 @@ from pubsub_sdk_python.errors import (
 )
 from pubsub_sdk_python.models import (
     PublishMessage,
-    PublishMessageResponse,
 )
 from pubsub_sdk_python.retry import (
     RetryConfig,
@@ -196,14 +195,11 @@ class PubSubPublisher:
         """Safe async sleep for retry backoff."""
         await asyncio.sleep(delay)
 
-    async def publish(self, messages: list[PublishMessage]) -> PublishMessageResponse:
+    async def publish(self, messages: list[PublishMessage]) -> None:
         """Publish messages to the topic.
 
         Args:
             messages: List of PublishMessage instances to send.
-
-        Returns:
-            PublishMessageResponse with the assigned message IDs.
 
         Raises:
             PubSubValidationError: If the request is invalid.
@@ -220,20 +216,17 @@ class PubSubPublisher:
 
         request_body = {"messages": [{"data": msg.data} for msg in messages]}
 
-        response = await self._request(
+        await self._request(
             "POST",
             "v1alpha/publish",
             json_data=request_body,
         )
 
-        data = response.json()
-        return PublishMessageResponse(message_ids=data.get("messageIds", []))
-
     async def publish_batch(
         self,
         messages: list[PublishMessage],
         batch_size: int = 100,
-    ) -> list[PublishMessageResponse]:
+    ) -> None:
         """Publish messages in batches.
 
         Splits the message list into batches and publishes each one sequentially.
@@ -241,19 +234,13 @@ class PubSubPublisher:
         Args:
             messages: All messages to publish.
             batch_size: Maximum messages per batch.
-
-        Returns:
-            List of PublishMessageResponse objects, one per batch.
         """
         if not messages:
-            return []
+            return
 
-        responses: list[PublishMessageResponse] = []
         for i in range(0, len(messages), batch_size):
             batch = messages[i : i + batch_size]
-            response = await self.publish(batch)
-            responses.append(response)
-        return responses
+            await self.publish(batch)
 
     async def purge_topic(self) -> None:
         """Purge all messages from the topic.

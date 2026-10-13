@@ -109,7 +109,7 @@ def _process_message(message: Message) -> bool:
         True if processing succeeded and the message should be acked,
         False if it should be nacked for redelivery.
     """
-    print(f"  processing message id={message.id}: {message.text!r}")
+    print(f"  processing message ack_id={message.ack_id}: {message.text!r}")
     return True
 
 

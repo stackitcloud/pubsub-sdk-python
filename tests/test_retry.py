@@ -212,9 +212,8 @@ class TestPublisherRetryIntegration:
         mock_client.aclose = AsyncMock()
 
         ok_response = MagicMock(spec=httpx.Response)
-        ok_response.status_code = 200
-        ok_response.json.return_value = {"messageIds": [1]}
-        ok_response.text = "OK"
+        ok_response.status_code = 204
+        ok_response.text = ""
 
         if retry_config is None:
             retry_config = type(
@@ -244,9 +243,8 @@ class TestPublisherRetryIntegration:
         error_response.text = "Service Unavailable"
 
         ok_response = MagicMock(spec=httpx.Response)
-        ok_response.status_code = 200
-        ok_response.json.return_value = {"messageIds": [42]}
-        ok_response.text = "OK"
+        ok_response.status_code = 204
+        ok_response.text = ""
 
         publisher = self._make_publisher(
             auth_provider,
@@ -254,7 +252,7 @@ class TestPublisherRetryIntegration:
         )
 
         result = await publisher.publish([PublishMessage.from_plain("test")])
-        assert result.message_ids == [42]
+        assert result is None
         assert publisher.http_client.request.call_count == 3
 
     async def test_publisher_no_retry_on_validation_error(self, auth_provider):

@@ -9,7 +9,6 @@ from pubsub_sdk_python.models import (
     Messages,
     NackMessagesFromTopicRequest,
     PublishMessage,
-    PublishMessageResponse,
     PublishMessageToTopicRequest,
     decode_message_data,
     decode_message_text,
@@ -45,36 +44,21 @@ class TestPublishMessageToTopicRequest:
         assert len(request.messages) == 2
 
 
-class TestPublishMessageResponse:
-    """Test PublishMessageResponse model."""
-
-    def test_has_message_ids(self):
-        response = PublishMessageResponse(message_ids=[1, 2, 3])
-        assert response.message_ids == [1, 2, 3]
-
-    def test_empty_message_ids(self):
-        response = PublishMessageResponse(message_ids=[])
-        assert response.message_ids == []
-
-
 class TestMessage:
     """Test Message model."""
 
     def test_create_message(self):
         msg = Message(
-            id=1,
             ack_id="ack-1",
             data=base64.b64encode(b"Hello").decode("ascii"),
             create_time=datetime(2024, 1, 1, 0, 0, 0),
             delivery_attempts=1,
         )
-        assert msg.id == 1
         assert msg.ack_id == "ack-1"
         assert msg.delivery_attempts == 1
 
     def test_payload_decodes_base64(self):
         msg = Message(
-            id=1,
             ack_id="ack-1",
             data=base64.b64encode(b"test data").decode("ascii"),
             create_time=datetime(2024, 1, 1, 0, 0, 0),
@@ -83,7 +67,6 @@ class TestMessage:
 
     def test_text_decodes_utf8(self):
         msg = Message(
-            id=1,
             ack_id="ack-1",
             data=base64.b64encode(b"Hello, World!").decode("ascii"),
             create_time=datetime(2024, 1, 1, 0, 0, 0),
@@ -96,14 +79,13 @@ class TestMessages:
 
     def test_container(self):
         msg = Message(
-            id=1,
             ack_id="ack-1",
             data=base64.b64encode(b"test").decode("ascii"),
             create_time=datetime(2024, 1, 1, 0, 0, 0),
         )
         container = Messages(messages=[msg])
         assert len(container.messages) == 1
-        assert container.messages[0].id == 1
+        assert container.messages[0].ack_id == "ack-1"
 
 
 class TestAckNackRequests:

@@ -80,7 +80,6 @@ class TestSubscriberPull:
         assert len(messages) == 2
         assert isinstance(messages[0], Message)
         assert messages[0].ack_id == "ack-1"
-        assert messages[0].id == 1
         assert messages[0].text == "Hello, World!"
         assert subscriber.messages_received == 2
         assert subscriber.pull_calls == 1
@@ -242,13 +241,11 @@ class TestSubscriberAck:
         subscriber = _make_subscriber(auth_provider, response)
         messages = [
             Message(
-                id=1,
                 ack_id="ack-1",
                 data="dGVzdA==",
                 create_time=datetime(2024, 1, 1, tzinfo=UTC),
             ),
             Message(
-                id=2,
                 ack_id="ack-2",
                 data="dGVzdA==",
                 create_time=datetime(2024, 1, 1, tzinfo=UTC),
@@ -291,7 +288,6 @@ class TestSubscriberNack:
         subscriber = _make_subscriber(auth_provider, response)
         messages = [
             Message(
-                id=1,
                 ack_id="ack-1",
                 data="dGVzdA==",
                 create_time=datetime(2024, 1, 1, tzinfo=UTC),

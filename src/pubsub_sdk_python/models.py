@@ -38,17 +38,9 @@ class PublishMessageToTopicRequest:
 
 
 @dataclass
-class PublishMessageResponse:
-    """Response from a successful publish operation."""
-
-    message_ids: list[int]
-
-
-@dataclass
 class Message:
     """A message returned from a pull operation."""
 
-    id: int
     ack_id: str
     data: str
     create_time: datetime
@@ -102,7 +94,6 @@ __all__ = [
     "Messages",
     "NackMessagesFromTopicRequest",
     "PublishMessage",
-    "PublishMessageResponse",
     "PublishMessageToTopicRequest",
     "decode_message_data",
     "decode_message_text",
