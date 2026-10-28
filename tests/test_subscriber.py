@@ -28,6 +28,7 @@ from pubsub_sdk_python.errors import (
     PubSubValidationError,
 )
 from pubsub_sdk_python.models import Message
+from pubsub_sdk_python.retry import RetryConfig
 from pubsub_sdk_python.subscriber import PubSubSubscriber
 
 
@@ -170,18 +171,14 @@ class TestSubscriberPull:
             subscription_id="test-sub",
             base_url="https://test.pubsub.eu01.onstackit.cloud",
             auth_provider=auth_provider,
-            retry_config=type(
-                "RetryConfig",
-                (),
-                {
-                    "max_retries": 3,
-                    "base_delay": 0.01,
-                    "max_delay": 0.05,
-                    "multiplier": 1.0,
-                    "retryable_exceptions": (PubSubServerError,),
-                    "retryable_status_codes": {503},
-                },
-            )(),
+            retry_config=RetryConfig(
+                max_retries=3,
+                base_delay=0.01,
+                max_delay=0.05,
+                multiplier=1.0,
+                retryable_exceptions=(PubSubServerError,),
+                retryable_status_codes={503},
+            ),
             http_client=mock_client,
         )
 
@@ -202,18 +199,14 @@ class TestSubscriberPull:
             subscription_id="test-sub",
             base_url="https://test.pubsub.eu01.onstackit.cloud",
             auth_provider=auth_provider,
-            retry_config=type(
-                "RetryConfig",
-                (),
-                {
-                    "max_retries": 2,
-                    "base_delay": 0.01,
-                    "max_delay": 0.05,
-                    "multiplier": 1.0,
-                    "retryable_exceptions": (PubSubServerError,),
-                    "retryable_status_codes": {503},
-                },
-            )(),
+            retry_config=RetryConfig(
+                max_retries=2,
+                base_delay=0.01,
+                max_delay=0.05,
+                multiplier=1.0,
+                retryable_exceptions=(PubSubServerError,),
+                retryable_status_codes={503},
+            ),
             http_client=mock_client,
         )
 

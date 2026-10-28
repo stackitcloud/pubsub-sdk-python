@@ -45,7 +45,5 @@ jobs:
       - name: Run integration tests
         env:
           SA_KEY_B64: ${{ secrets.SA_KEY_B64 }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          TOKEN_URL: ${{ secrets.TOKEN_URL }}
-          REGION: ${{ secrets.REGION }}
-        run: uv run pytest tests/integration/ -v --timeout=700 --no-cov
+          STACKIT_PROJECT_ID: ${{ secrets.STACKIT_PROJECT_ID }}
+        run: uv run pytest tests/integration/ -v -s --timeout=700 --no-cov

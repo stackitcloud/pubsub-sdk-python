@@ -35,6 +35,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "pytest-timeout>=2.3.0",
     "ruff>=0.8.0",
+    "ty>=0.0.93",
 ]
 
 [tool.pytest.ini_options]

@@ -207,8 +207,12 @@ class PubSubSubscriber:
                     raise
 
                 if attempt >= self.retry_config.max_retries:
+                    msg = (
+                        f"All {self.retry_config.max_retries} retry attempts "
+                        f"exhausted for {path}: {exc}"
+                    )
                     raise PubSubRetryError(
-                        f"All {self.retry_config.max_retries} retry attempts exhausted for {path}",
+                        msg,
                         causes=[last_exception] if last_exception else None,
                     ) from exc
 
@@ -224,7 +228,7 @@ class PubSubSubscriber:
                 )
                 await self._safe_sleep(delay)
 
-        raise last_exception  # type: ignore[misc]
+        raise PubSubRetryError("Retry loop terminated unexpectedly")
 
     @staticmethod
     async def _safe_sleep(delay: float) -> None:

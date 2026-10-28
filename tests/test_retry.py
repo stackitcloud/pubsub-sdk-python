@@ -169,6 +169,19 @@ class TestWithRetrySync:
             my_func()
         assert call_count == 4  # 1 initial + 3 retries
 
+    def test_sync_with_custom_config(self):
+        call_count = 0
+
+        @with_retry(config=RetryConfig(max_retries=1, base_delay=0.01, max_delay=0.02))
+        def my_func():
+            nonlocal call_count
+            call_count += 1
+            raise PubSubServerError("Server error")
+
+        with pytest.raises(PubSubRetryError, match="All 1 retry attempts exhausted: Server error"):
+            my_func()
+        assert call_count == 2
+
 
 @pytest.mark.asyncio
 class TestWithAsyncRetry:
@@ -215,6 +228,19 @@ class TestWithAsyncRetry:
             await my_func()
         assert call_count == 4
 
+    async def test_async_with_custom_config(self):
+        call_count = 0
+
+        @with_async_retry(config=RetryConfig(max_retries=1, base_delay=0.01, max_delay=0.02))
+        async def my_func():
+            nonlocal call_count
+            call_count += 1
+            raise PubSubServerError("Server error")
+
+        with pytest.raises(PubSubRetryError, match="All 1 retry attempts exhausted: Server error"):
+            await my_func()
+        assert call_count == 2
+
 
 @pytest.mark.asyncio
 class TestPublisherRetryIntegration:
@@ -230,18 +256,14 @@ class TestPublisherRetryIntegration:
         ok_response.text = ""
 
         if retry_config is None:
-            retry_config = type(
-                "RetryConfig",
-                (),
-                {
-                    "max_retries": 3,
-                    "base_delay": 0.01,
-                    "max_delay": 0.05,
-                    "multiplier": 1.0,
-                    "retryable_exceptions": (PubSubServerError,),
-                    "retryable_status_codes": {500, 502, 503, 504},
-                },
-            )()
+            retry_config = RetryConfig(
+                max_retries=3,
+                base_delay=0.01,
+                max_delay=0.05,
+                multiplier=1.0,
+                retryable_exceptions=(PubSubServerError,),
+                retryable_status_codes={500, 502, 503, 504},
+            )
 
         return PubSubPublisher(
             topic_id="test-topic",
@@ -289,18 +311,14 @@ class TestPublisherRetryIntegration:
         publisher = self._make_publisher(
             auth_provider,
             side_effect=[error_response] * 10,
-            retry_config=type(
-                "RetryConfig",
-                (),
-                {
-                    "max_retries": 2,
-                    "base_delay": 0.01,
-                    "max_delay": 0.05,
-                    "multiplier": 1.0,
-                    "retryable_exceptions": (PubSubServerError,),
-                    "retryable_status_codes": {503},
-                },
-            )(),
+            retry_config=RetryConfig(
+                max_retries=2,
+                base_delay=0.01,
+                max_delay=0.05,
+                multiplier=1.0,
+                retryable_exceptions=(PubSubServerError,),
+                retryable_status_codes={503},
+            ),
         )
 
         with pytest.raises(PubSubRetryError):
