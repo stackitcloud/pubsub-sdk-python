@@ -18,6 +18,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Lint & Test
@@ -59,6 +62,13 @@ jobs:
         with:
           python-version: "3.14"
           enable-cache: true
+
+      - name: Set version from release tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          uv version "$VERSION"
 
       - name: Build sdist and wheel
         run: uv build
