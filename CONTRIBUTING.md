@@ -74,7 +74,7 @@ We maintain a high bar for reliability and test coverage:
     ```bash
     make test
     ```
-  - Integration tests interact with STACKIT PubSub APIs and expect configuration variables (`SA_KEY_B64`, `PROJECT_ID`, `TOKEN_URL`, `REGION`). Run them with `uv run pytest tests/integration/ --no-cov`.
+  - Integration tests interact with STACKIT PubSub APIs and expect configuration variables (`SA_KEY_B64`, `STACKIT_PROJECT_ID`). Run them with `uv run pytest tests/integration/ --no-cov`.
 
 ---
 

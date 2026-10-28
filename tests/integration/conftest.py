@@ -16,15 +16,15 @@
 
 Requires the following secrets to be set:
 - SA_KEY_B64: Base64 encoded service account key JSON
-- PROJECT_ID: STACKIT project ID
-- TOKEN_URL: OAuth token endpoint
-- REGION: API region (e.g. eu01)
+- STACKIT_PROJECT_ID: STACKIT project ID
 """
 
 from __future__ import annotations
 
 import base64
 import contextlib
+import hashlib
+import json
 import os
 import time
 from pathlib import Path
@@ -37,7 +37,15 @@ from pubsub_sdk_python.client import PubSubClient
 from pubsub_sdk_python.retry import with_retry
 
 SA_KEY_PATH = "sa-key.json"
-SA_EMAIL = "break-test-jennifer-qzj3sci8@sa.stackit.cloud"
+
+
+def pytest_report_header() -> list[str]:
+    """Print the SHA512 sum of STACKIT_PROJECT_ID in the pytest header."""
+    pid = os.environ.get("STACKIT_PROJECT_ID", "")
+    if pid:
+        digest = hashlib.sha512(pid.encode("utf-8")).hexdigest()
+        return [f"STACKIT_PROJECT_ID SHA512: {digest}"]
+    return []
 
 
 def _load_sa_key() -> str:
@@ -341,6 +349,12 @@ def sa_key() -> str:
 
 
 @pytest.fixture(scope="session")
+def sa_email(sa_key: str) -> str:
+    """Extract the service account email (credentials.iss) from SA_KEY."""
+    return json.loads(sa_key)["credentials"]["iss"]
+
+
+@pytest.fixture(scope="session")
 def auth_config(sa_key: str) -> AuthConfig:
     """Create AuthConfig from SA_KEY."""
     return AuthConfig(
@@ -360,9 +374,11 @@ def control_plane_url() -> str:
 @pytest.fixture(scope="session")
 def project_id() -> str:
     """Get the project ID from environment."""
-    pid = os.environ.get("PROJECT_ID")
+    pid = os.environ.get("STACKIT_PROJECT_ID")
     if not pid:
-        raise ValueError("PROJECT_ID environment variable is required")
+        raise ValueError("STACKIT_PROJECT_ID environment variable is required")
+    digest = hashlib.sha512(pid.encode("utf-8")).hexdigest()
+    print(f"STACKIT_PROJECT_ID SHA512: {digest}")
     return pid
 
 
@@ -378,6 +394,7 @@ def topic_id(
     project_id: str,
     region: str,
     auth_config: AuthConfig,
+    sa_email: str,
 ):
     """Create a topic once for all tests in this run, then delete it."""
     auth_header = _create_auth_header(auth_config)
@@ -407,9 +424,9 @@ def topic_id(
         region=region,
         topic_id=new_topic_id,
         auth_header=auth_header,
-        email=SA_EMAIL,
+        email=sa_email,
     )
-    print(f"Granted publisher access for {SA_EMAIL} on topic {new_topic_id}")
+    print(f"Granted publisher access for {sa_email} on topic {new_topic_id}")
 
     yield new_topic_id
 
@@ -468,6 +485,7 @@ def subscription_id(
     region: str,
     topic_id: str,
     auth_config: AuthConfig,
+    sa_email: str,
 ):
     """Create a subscription once and reuse for all tests that need it."""
     auth_header = _create_auth_header(auth_config)
@@ -539,9 +557,9 @@ def subscription_id(
             topic_id=topic_id,
             subscription_id=sub_id,
             auth_header=auth_header,
-            email=SA_EMAIL,
+            email=sa_email,
         )
-        print(f"Granted subscriber access for {SA_EMAIL} on subscription {sub_id}")
+        print(f"Granted subscriber access for {sa_email} on subscription {sub_id}")
 
     else:
         sub_id = existing_subs[0]["id"]
