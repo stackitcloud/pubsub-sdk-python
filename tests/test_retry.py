@@ -169,6 +169,19 @@ class TestWithRetrySync:
             my_func()
         assert call_count == 4  # 1 initial + 3 retries
 
+    def test_sync_with_custom_config(self):
+        call_count = 0
+
+        @with_retry(config=RetryConfig(max_retries=1, base_delay=0.01, max_delay=0.02))
+        def my_func():
+            nonlocal call_count
+            call_count += 1
+            raise PubSubServerError("Server error")
+
+        with pytest.raises(PubSubRetryError, match="All 1 retry attempts exhausted: Server error"):
+            my_func()
+        assert call_count == 2
+
 
 @pytest.mark.asyncio
 class TestWithAsyncRetry:
@@ -214,6 +227,19 @@ class TestWithAsyncRetry:
         with pytest.raises(PubSubRetryError):
             await my_func()
         assert call_count == 4
+
+    async def test_async_with_custom_config(self):
+        call_count = 0
+
+        @with_async_retry(config=RetryConfig(max_retries=1, base_delay=0.01, max_delay=0.02))
+        async def my_func():
+            nonlocal call_count
+            call_count += 1
+            raise PubSubServerError("Server error")
+
+        with pytest.raises(PubSubRetryError, match="All 1 retry attempts exhausted: Server error"):
+            await my_func()
+        assert call_count == 2
 
 
 @pytest.mark.asyncio

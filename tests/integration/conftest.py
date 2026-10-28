@@ -33,9 +33,17 @@ import pytest
 
 from pubsub_sdk_python.auth import AuthConfig, StackitAuthProvider
 from pubsub_sdk_python.client import PubSubClient
-from pubsub_sdk_python.retry import with_retry
+from pubsub_sdk_python.errors import PubSubServerError
+from pubsub_sdk_python.retry import RetryConfig, with_retry
 
 SA_KEY_PATH = "sa-key.json"
+
+CONTROL_PLANE_RETRY_CONFIG = RetryConfig(
+    max_retries=6,
+    base_delay=2.0,
+    max_delay=30.0,
+    multiplier=2.0,
+)
 
 
 def _log(msg: str) -> None:
@@ -90,6 +98,9 @@ def _create_auth_header(auth_config: AuthConfig) -> dict[str, str]:
 
 def _raise_for_status(response: httpx.Response) -> None:
     """Raise HTTPStatusError with response body details if request failed."""
+    if response.status_code in {429, 500, 502, 503, 504}:
+        body = response.text.strip()
+        raise PubSubServerError(f"Server error {response.status_code}: {body}")
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
@@ -103,7 +114,7 @@ def _raise_for_status(response: httpx.Response) -> None:
         raise
 
 
-@with_retry
+@with_retry(config=CONTROL_PLANE_RETRY_CONFIG)
 def _create_topic(
     control_plane_url: str,
     project_id: str,
@@ -134,7 +145,7 @@ def _create_topic(
         return topic["id"]
 
 
-@with_retry
+@with_retry(config=CONTROL_PLANE_RETRY_CONFIG)
 def _create_subscription(
     control_plane_url: str,
     project_id: str,
@@ -212,7 +223,7 @@ def _wait_for_resource_active(
     while time.time() - start_time < timeout:
         try:
             resource = _get_resource(url, auth_header)
-        except httpx.TransportError as exc:
+        except (httpx.TransportError, PubSubServerError) as exc:
             # The resource may not be reachable yet right after creation
             # (e.g. backend routing not provisioned) - keep polling until timeout.
             _log(f"{resource_type} {resource_id} not reachable yet, retrying: {exc}")
@@ -232,7 +243,7 @@ def _wait_for_resource_active(
     raise TimeoutError(f"{resource_type} {resource_id} did not become active within {timeout}s")
 
 
-@with_retry
+@with_retry(config=CONTROL_PLANE_RETRY_CONFIG)
 def _delete_topic(
     control_plane_url: str,
     project_id: str,
@@ -254,7 +265,7 @@ def _delete_topic(
             _raise_for_status(response)
 
 
-@with_retry
+@with_retry(config=CONTROL_PLANE_RETRY_CONFIG)
 def _list_subscriptions(
     control_plane_url: str,
     project_id: str,
@@ -280,7 +291,7 @@ def _list_subscriptions(
         return data.get("subscriptions", [])
 
 
-@with_retry
+@with_retry(config=CONTROL_PLANE_RETRY_CONFIG)
 def _delete_subscription(
     control_plane_url: str,
     project_id: str,
@@ -306,7 +317,7 @@ def _delete_subscription(
             _raise_for_status(response)
 
 
-@with_retry
+@with_retry(config=CONTROL_PLANE_RETRY_CONFIG)
 def _grant_topic_publisher_access(
     control_plane_url: str,
     project_id: str,
@@ -334,7 +345,7 @@ def _grant_topic_publisher_access(
         _raise_for_status(response)
 
 
-@with_retry
+@with_retry(config=CONTROL_PLANE_RETRY_CONFIG)
 def _grant_subscription_subscriber_access(
     control_plane_url: str,
     project_id: str,

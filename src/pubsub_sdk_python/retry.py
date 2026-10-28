@@ -21,7 +21,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any, TypeVar, overload
 
 import httpx
 
@@ -136,11 +136,24 @@ def _should_retry(
     return False
 
 
-def with_retry(func: Callable[..., T]) -> Callable[..., T]:
+@overload
+def with_retry(func: Callable[..., T]) -> Callable[..., T]: ...
+
+
+@overload
+def with_retry(
+    func: None = None, *, config: RetryConfig | None = None
+) -> Callable[[Callable[..., T]], Callable[..., T]]: ...
+
+
+def with_retry(
+    func: Callable[..., T] | None = None, *, config: RetryConfig | None = None
+) -> Callable[..., T] | Callable[[Callable[..., T]], Callable[..., T]]:
     """Decorator that adds retry logic with exponential backoff to a synchronous function.
 
     Args:
         func: The synchronous function to wrap.
+        config: Optional RetryConfig to use.
 
     Returns:
         The wrapped function with retry logic.
@@ -150,45 +163,66 @@ def with_retry(func: Callable[..., T]) -> Callable[..., T]:
         def my_api_call():
             ...  # Will retry on transient errors
     """
-    config = RetryConfig()
+    retry_config = config or RetryConfig()
 
-    @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> T:
-        last_exception: Exception | None = None
-        for attempt in range(config.max_retries + 1):
-            try:
-                return func(*args, **kwargs)
-            except Exception as exc:
-                last_exception = exc
-                if not _should_retry(exc, config=config):
-                    raise
-                if attempt >= config.max_retries:
-                    raise PubSubRetryError(
-                        f"All {config.max_retries} retry attempts exhausted: {exc}",
-                        causes=[last_exception] if last_exception else None,
-                    ) from exc
-                delay = _calculate_delay(config, attempt)
-                logger.warning(
-                    "Retry attempt %d/%d for %s after %.2fs: %s",
-                    attempt + 1,
-                    config.max_retries,
-                    getattr(func, "__name__", repr(func)),
-                    delay,
-                    exc,
-                )
-                time.sleep(delay)
-        raise PubSubRetryError("Retry loop terminated unexpectedly")
+    def decorator(fn: Callable[..., T]) -> Callable[..., T]:
+        @wraps(fn)
+        def wrapper(*args: Any, **kwargs: Any) -> T:
+            last_exception: Exception | None = None
+            for attempt in range(retry_config.max_retries + 1):
+                try:
+                    return fn(*args, **kwargs)
+                except Exception as exc:
+                    last_exception = exc
+                    if not _should_retry(exc, config=retry_config):
+                        raise
+                    if attempt >= retry_config.max_retries:
+                        raise PubSubRetryError(
+                            f"All {retry_config.max_retries} retry attempts exhausted: {exc}",
+                            causes=[last_exception] if last_exception else None,
+                        ) from exc
+                    delay = _calculate_delay(retry_config, attempt)
+                    logger.warning(
+                        "Retry attempt %d/%d for %s after %.2fs: %s",
+                        attempt + 1,
+                        retry_config.max_retries,
+                        getattr(fn, "__name__", repr(fn)),
+                        delay,
+                        exc,
+                    )
+                    time.sleep(delay)
+            raise PubSubRetryError("Retry loop terminated unexpectedly")
 
-    return wrapper
+        return wrapper
+
+    if func is not None:
+        return decorator(func)
+    return decorator
 
 
-def with_async_retry(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+@overload
+def with_async_retry(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]: ...
+
+
+@overload
+def with_async_retry(
+    func: None = None, *, config: RetryConfig | None = None
+) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]: ...
+
+
+def with_async_retry(
+    func: Callable[..., Awaitable[T]] | None = None, *, config: RetryConfig | None = None
+) -> (
+    Callable[..., Awaitable[T]]
+    | Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]
+):
     """Async-friendly retry decorator.
 
     Adds retry logic with exponential backoff to an async function.
 
     Args:
         func: The async function to wrap.
+        config: Optional RetryConfig to use.
 
     Returns:
         The wrapped async function with retry logic.
@@ -198,36 +232,41 @@ def with_async_retry(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitab
         async def my_async_api_call():
             ...  # Will retry on transient errors
     """
-    config = RetryConfig()
+    retry_config = config or RetryConfig()
 
-    @wraps(func)
-    async def wrapper(*args: Any, **kwargs: Any) -> T:
-        last_exception: Exception | None = None
-        for attempt in range(config.max_retries + 1):
-            try:
-                return await func(*args, **kwargs)
-            except Exception as exc:
-                last_exception = exc
-                if not _should_retry(exc, config=config):
-                    raise
-                if attempt >= config.max_retries:
-                    raise PubSubRetryError(
-                        f"All {config.max_retries} retry attempts exhausted: {exc}",
-                        causes=[last_exception] if last_exception else None,
-                    ) from exc
-                delay = _calculate_delay(config, attempt)
-                logger.warning(
-                    "Retry attempt %d/%d for %s after %.2fs: %s",
-                    attempt + 1,
-                    config.max_retries,
-                    getattr(func, "__name__", repr(func)),
-                    delay,
-                    exc,
-                )
-                await asyncio.sleep(delay)
-        raise PubSubRetryError("Retry loop terminated unexpectedly")
+    def decorator(fn: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+        @wraps(fn)
+        async def wrapper(*args: Any, **kwargs: Any) -> T:
+            last_exception: Exception | None = None
+            for attempt in range(retry_config.max_retries + 1):
+                try:
+                    return await fn(*args, **kwargs)
+                except Exception as exc:
+                    last_exception = exc
+                    if not _should_retry(exc, config=retry_config):
+                        raise
+                    if attempt >= retry_config.max_retries:
+                        raise PubSubRetryError(
+                            f"All {retry_config.max_retries} retry attempts exhausted: {exc}",
+                            causes=[last_exception] if last_exception else None,
+                        ) from exc
+                    delay = _calculate_delay(retry_config, attempt)
+                    logger.warning(
+                        "Retry attempt %d/%d for %s after %.2fs: %s",
+                        attempt + 1,
+                        retry_config.max_retries,
+                        getattr(fn, "__name__", repr(fn)),
+                        delay,
+                        exc,
+                    )
+                    await asyncio.sleep(delay)
+            raise PubSubRetryError("Retry loop terminated unexpectedly")
 
-    return wrapper
+        return wrapper
+
+    if func is not None:
+        return decorator(func)
+    return decorator
 
 
 def get_retry_delay(config: RetryConfig, attempt: int) -> float:
