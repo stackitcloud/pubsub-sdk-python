@@ -164,7 +164,7 @@ def with_retry(func: Callable[..., T]) -> Callable[..., T]:
                     raise
                 if attempt >= config.max_retries:
                     raise PubSubRetryError(
-                        f"All {config.max_retries} retry attempts exhausted",
+                        f"All {config.max_retries} retry attempts exhausted: {exc}",
                         causes=[last_exception] if last_exception else None,
                     ) from exc
                 delay = _calculate_delay(config, attempt)
@@ -172,13 +172,12 @@ def with_retry(func: Callable[..., T]) -> Callable[..., T]:
                     "Retry attempt %d/%d for %s after %.2fs: %s",
                     attempt + 1,
                     config.max_retries,
-                    func.__name__,
+                    getattr(func, "__name__", repr(func)),
                     delay,
                     exc,
                 )
                 time.sleep(delay)
-        # Unreachable but mypy needs it
-        raise last_exception  # type: ignore[misc]
+        raise PubSubRetryError("Retry loop terminated unexpectedly")
 
     return wrapper
 
@@ -213,7 +212,7 @@ def with_async_retry(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitab
                     raise
                 if attempt >= config.max_retries:
                     raise PubSubRetryError(
-                        f"All {config.max_retries} retry attempts exhausted",
+                        f"All {config.max_retries} retry attempts exhausted: {exc}",
                         causes=[last_exception] if last_exception else None,
                     ) from exc
                 delay = _calculate_delay(config, attempt)
@@ -221,12 +220,12 @@ def with_async_retry(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitab
                     "Retry attempt %d/%d for %s after %.2fs: %s",
                     attempt + 1,
                     config.max_retries,
-                    func.__name__,
+                    getattr(func, "__name__", repr(func)),
                     delay,
                     exc,
                 )
                 await asyncio.sleep(delay)
-        raise last_exception  # type: ignore[misc]
+        raise PubSubRetryError("Retry loop terminated unexpectedly")
 
     return wrapper
 

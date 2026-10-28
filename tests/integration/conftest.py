@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import base64
 import contextlib
-import hashlib
 import json
 import os
 import time
@@ -32,20 +31,28 @@ from pathlib import Path
 import httpx
 import pytest
 
-from pubsub_sdk_python.auth import AuthConfig
+from pubsub_sdk_python.auth import AuthConfig, StackitAuthProvider
 from pubsub_sdk_python.client import PubSubClient
 from pubsub_sdk_python.retry import with_retry
 
 SA_KEY_PATH = "sa-key.json"
 
 
-def pytest_report_header() -> list[str]:
-    """Print the SHA512 sum of STACKIT_PROJECT_ID in the pytest header."""
-    pid = os.environ.get("STACKIT_PROJECT_ID", "")
-    if pid:
-        digest = hashlib.sha512(pid.encode("utf-8")).hexdigest()
-        return [f"STACKIT_PROJECT_ID SHA512: {digest}"]
-    return []
+def _log(msg: str) -> None:
+    """Print an integration test log message on its own line."""
+    print(f"\n[integration] {msg}", flush=True)
+
+
+def _format_error(exc: BaseException) -> str:
+    """Format an exception with its HTTP response body and underlying cause."""
+    details = f"{type(exc).__name__}: {exc}"
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None:
+        body = exc.response.text.strip()
+        if body:
+            details += f" (response body: {body})"
+    if exc.__cause__ is not None:
+        details += f" | caused by {_format_error(exc.__cause__)}"
+    return details
 
 
 def _load_sa_key() -> str:
@@ -77,10 +84,23 @@ def _get_control_plane_url() -> str:
 
 def _create_auth_header(auth_config: AuthConfig) -> dict[str, str]:
     """Create an auth header using the StackitAuthProvider."""
-    from pubsub_sdk_python.auth import StackitAuthProvider
-
     provider = StackitAuthProvider(auth_config)
     return provider.get_auth_header()
+
+
+def _raise_for_status(response: httpx.Response) -> None:
+    """Raise HTTPStatusError with response body details if request failed."""
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        body = response.text.strip()
+        if body:
+            raise httpx.HTTPStatusError(
+                f"{exc} - response body: {body}",
+                request=exc.request,
+                response=exc.response,
+            ) from None
+        raise
 
 
 @with_retry
@@ -109,7 +129,7 @@ def _create_topic(
             headers={**auth_header, "Content-Type": "application/json"},
             timeout=30.0,
         )
-        response.raise_for_status()
+        _raise_for_status(response)
         topic = response.json()
         return topic["id"]
 
@@ -145,7 +165,7 @@ def _create_subscription(
             headers={**auth_header, "Content-Type": "application/json"},
             timeout=30.0,
         )
-        response.raise_for_status()
+        _raise_for_status(response)
         subscription = response.json()
         return subscription["id"]
 
@@ -158,7 +178,7 @@ def _get_resource(url: str, auth_header: dict[str, str]) -> dict:
             headers={**auth_header, "Content-Type": "application/json"},
             timeout=30.0,
         )
-        response.raise_for_status()
+        _raise_for_status(response)
         return response.json()
 
 
@@ -195,7 +215,7 @@ def _wait_for_resource_active(
         except httpx.TransportError as exc:
             # The resource may not be reachable yet right after creation
             # (e.g. backend routing not provisioned) - keep polling until timeout.
-            print(f"{resource_type} {resource_id} not reachable yet, retrying: {exc}")
+            _log(f"{resource_type} {resource_id} not reachable yet, retrying: {exc}")
             time.sleep(poll_interval)
             continue
 
@@ -206,6 +226,7 @@ def _wait_for_resource_active(
         if state == "deleting":
             raise RuntimeError(f"{resource_type} entered deleting state: {resource_id}")
 
+        _log(f"Waiting for {resource_type} {resource_id} to become active (state: {state})")
         time.sleep(poll_interval)
 
     raise TimeoutError(f"{resource_type} {resource_id} did not become active within {timeout}s")
@@ -230,7 +251,7 @@ def _delete_topic(
             timeout=30.0,
         )
         if response.status_code not in (202, 404):
-            response.raise_for_status()
+            _raise_for_status(response)
 
 
 @with_retry
@@ -254,7 +275,7 @@ def _list_subscriptions(
             headers={**auth_header, "Content-Type": "application/json"},
             timeout=30.0,
         )
-        response.raise_for_status()
+        _raise_for_status(response)
         data = response.json()
         return data.get("subscriptions", [])
 
@@ -282,7 +303,7 @@ def _delete_subscription(
             timeout=30.0,
         )
         if response.status_code not in (202, 404):
-            response.raise_for_status()
+            _raise_for_status(response)
 
 
 @with_retry
@@ -310,7 +331,7 @@ def _grant_topic_publisher_access(
             headers={**auth_header, "Content-Type": "application/json"},
             timeout=30.0,
         )
-        response.raise_for_status()
+        _raise_for_status(response)
 
 
 @with_retry
@@ -339,7 +360,7 @@ def _grant_subscription_subscriber_access(
             headers={**auth_header, "Content-Type": "application/json"},
             timeout=30.0,
         )
-        response.raise_for_status()
+        _raise_for_status(response)
 
 
 @pytest.fixture(scope="session")
@@ -366,6 +387,12 @@ def auth_config(sa_key: str) -> AuthConfig:
 
 
 @pytest.fixture(scope="session")
+def auth_provider(auth_config: AuthConfig) -> StackitAuthProvider:
+    """Create a session-scoped StackitAuthProvider for control plane API calls."""
+    return StackitAuthProvider(auth_config)
+
+
+@pytest.fixture(scope="session")
 def control_plane_url() -> str:
     """Get the control plane URL from environment or construct from REGION."""
     return _get_control_plane_url()
@@ -377,8 +404,6 @@ def project_id() -> str:
     pid = os.environ.get("STACKIT_PROJECT_ID")
     if not pid:
         raise ValueError("STACKIT_PROJECT_ID environment variable is required")
-    digest = hashlib.sha512(pid.encode("utf-8")).hexdigest()
-    print(f"STACKIT_PROJECT_ID SHA512: {digest}")
     return pid
 
 
@@ -393,20 +418,18 @@ def topic_id(
     control_plane_url: str,
     project_id: str,
     region: str,
-    auth_config: AuthConfig,
+    auth_provider: StackitAuthProvider,
     sa_email: str,
 ):
     """Create a topic once for all tests in this run, then delete it."""
-    auth_header = _create_auth_header(auth_config)
-
     new_topic_id = _create_topic(
         control_plane_url=control_plane_url,
         project_id=project_id,
         region=region,
-        auth_header=auth_header,
+        auth_header=auth_provider.get_auth_header(),
         display_name="sdk-integration-test-shared",
     )
-    print(f"Created topic: {new_topic_id}")
+    _log(f"Created topic: {new_topic_id}")
 
     _wait_for_resource_active(
         control_plane_url=control_plane_url,
@@ -414,34 +437,66 @@ def topic_id(
         region=region,
         resource_type="topics",
         resource_id=new_topic_id,
-        auth_header=auth_header,
+        auth_header=auth_provider.get_auth_header(),
     )
-    print(f"Topic {new_topic_id} is active")
+    _log(f"Topic {new_topic_id} is active")
 
     _grant_topic_publisher_access(
         control_plane_url=control_plane_url,
         project_id=project_id,
         region=region,
         topic_id=new_topic_id,
-        auth_header=auth_header,
+        auth_header=auth_provider.get_auth_header(),
         email=sa_email,
     )
-    print(f"Granted publisher access for {sa_email} on topic {new_topic_id}")
+    _log(f"Granted publisher access for {sa_email} on topic {new_topic_id}")
 
     yield new_topic_id
 
-    print(f"Deleting shared topic: {new_topic_id}")
+    _log(f"Deleting shared topic: {new_topic_id}")
+    try:
+        subs = _list_subscriptions(
+            control_plane_url=control_plane_url,
+            project_id=project_id,
+            region=region,
+            topic_id=new_topic_id,
+            auth_header=auth_provider.get_auth_header(),
+        )
+        for sub in subs:
+            sub_id = sub.get("id")
+            if sub_id:
+                try:
+                    _delete_subscription(
+                        control_plane_url=control_plane_url,
+                        project_id=project_id,
+                        region=region,
+                        topic_id=new_topic_id,
+                        subscription_id=sub_id,
+                        auth_header=auth_provider.get_auth_header(),
+                    )
+                    _log(f"Deleted subscription {sub_id} on topic {new_topic_id}")
+                except Exception as sub_exc:
+                    _log(
+                        f"Failed to delete subscription {sub_id} on topic {new_topic_id}: "
+                        f"{_format_error(sub_exc)}"
+                    )
+    except Exception as list_exc:
+        _log(
+            f"Failed to list subscriptions before deleting topic {new_topic_id}: "
+            f"{_format_error(list_exc)}"
+        )
+
     try:
         _delete_topic(
             control_plane_url=control_plane_url,
             project_id=project_id,
             region=region,
             topic_id=new_topic_id,
-            auth_header=auth_header,
+            auth_header=auth_provider.get_auth_header(),
         )
-        print(f"Deleted shared topic: {new_topic_id}")
+        _log(f"Deleted shared topic: {new_topic_id}")
     except Exception as e:
-        print(f"Failed to delete shared topic {new_topic_id}: {e}")
+        _log(f"Failed to delete shared topic {new_topic_id}: {_format_error(e)}")
 
 
 @pytest.fixture(scope="session")
@@ -455,9 +510,9 @@ def base_url(topic_id: str) -> str:
 
 
 @pytest.fixture()
-def auth_header(auth_config: AuthConfig) -> dict[str, str]:
+def auth_header(auth_provider: StackitAuthProvider) -> dict[str, str]:
     """Create an auth header for API calls."""
-    return _create_auth_header(auth_config)
+    return auth_provider.get_auth_header()
 
 
 @pytest.fixture()
@@ -484,23 +539,21 @@ def subscription_id(
     project_id: str,
     region: str,
     topic_id: str,
-    auth_config: AuthConfig,
+    auth_provider: StackitAuthProvider,
     sa_email: str,
 ):
     """Create a subscription once and reuse for all tests that need it."""
-    auth_header = _create_auth_header(auth_config)
-
     existing_subs = _list_subscriptions(
         control_plane_url=control_plane_url,
         project_id=project_id,
         region=region,
         topic_id=topic_id,
-        auth_header=auth_header,
+        auth_header=auth_provider.get_auth_header(),
     )
 
     if existing_subs:
         sub_id = existing_subs[0]["id"]
-        print(f"Reusing existing subscription: {sub_id}")
+        _log(f"Reusing existing subscription: {sub_id}")
 
         try:
             _wait_for_resource_active(
@@ -509,14 +562,14 @@ def subscription_id(
                 region=region,
                 resource_type="subscriptions",
                 resource_id=sub_id,
-                auth_header=auth_header,
+                auth_header=auth_provider.get_auth_header(),
                 poll_interval=10.0,
                 timeout=60.0,
                 topic_id=topic_id,
             )
-            print(f"Subscription {sub_id} is active")
+            _log(f"Subscription {sub_id} is active")
         except TimeoutError:
-            print(f"Subscription {sub_id} not active, creating new subscription")
+            _log(f"Subscription {sub_id} not active, creating new subscription")
             with contextlib.suppress(Exception):
                 _delete_subscription(
                     control_plane_url=control_plane_url,
@@ -524,7 +577,7 @@ def subscription_id(
                     region=region,
                     topic_id=topic_id,
                     subscription_id=sub_id,
-                    auth_header=auth_header,
+                    auth_header=auth_provider.get_auth_header(),
                 )
             existing_subs = []
 
@@ -534,10 +587,10 @@ def subscription_id(
             project_id=project_id,
             region=region,
             topic_id=topic_id,
-            auth_header=auth_header,
+            auth_header=auth_provider.get_auth_header(),
             display_name="sdk-sub-integration-shared",
         )
-        print(f"Created subscription: {sub_id}")
+        _log(f"Created subscription: {sub_id}")
 
         _wait_for_resource_active(
             control_plane_url=control_plane_url,
@@ -545,10 +598,10 @@ def subscription_id(
             region=region,
             resource_type="subscriptions",
             resource_id=sub_id,
-            auth_header=auth_header,
+            auth_header=auth_provider.get_auth_header(),
             topic_id=topic_id,
         )
-        print(f"Subscription {sub_id} is active")
+        _log(f"Subscription {sub_id} is active")
 
         _grant_subscription_subscriber_access(
             control_plane_url=control_plane_url,
@@ -556,10 +609,10 @@ def subscription_id(
             region=region,
             topic_id=topic_id,
             subscription_id=sub_id,
-            auth_header=auth_header,
+            auth_header=auth_provider.get_auth_header(),
             email=sa_email,
         )
-        print(f"Granted subscriber access for {sa_email} on subscription {sub_id}")
+        _log(f"Granted subscriber access for {sa_email} on subscription {sub_id}")
 
     else:
         sub_id = existing_subs[0]["id"]
@@ -583,8 +636,8 @@ async def purge_between_tests(pubsub_client: PubSubClient):
     pub = pubsub_client.get_publisher()
     try:
         await pub.purge_topic()
-        print(f"Purged topic: {pubsub_client.topic_id}")
+        _log(f"Purged topic: {pubsub_client.topic_id}")
     except Exception as e:
-        print(f"Failed to purge topic: {e}")
+        _log(f"Failed to purge topic: {_format_error(e)}")
     finally:
         await pub.close()

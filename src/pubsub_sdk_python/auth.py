@@ -102,8 +102,9 @@ class StackitAuthProvider:
                     except requests.RequestException as e:
                         raise requests.RequestException("Initial token fetch failed") from e
 
-                KeyAuth._KeyAuth__fetch_token_from_endpoint = _patched_fetch
-                KeyAuth._KeyAuth__patched = True
+                key_auth_any: Any = KeyAuth
+                key_auth_any._KeyAuth__fetch_token_from_endpoint = _patched_fetch
+                key_auth_any._KeyAuth__patched = True
 
             import jwt
 

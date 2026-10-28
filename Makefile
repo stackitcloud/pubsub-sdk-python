@@ -5,13 +5,16 @@ install:
 	uv pip install -e .
 
 lint:
-	uvx ruff@0.16.4 check
+	uv run ruff check src/ tests/
 
 format:
-	uvx ruff@0.16.4 format
+	uv run ruff format src/ tests/
 
-check: lint format
-	uvx ruff@0.16.4 format --check
+typecheck:
+	uv run ty check
+
+check: lint format typecheck
+	uv run ruff format --check src/ tests/
 
 test: check install
 	uv run pytest

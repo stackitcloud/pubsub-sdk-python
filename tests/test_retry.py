@@ -230,18 +230,14 @@ class TestPublisherRetryIntegration:
         ok_response.text = ""
 
         if retry_config is None:
-            retry_config = type(
-                "RetryConfig",
-                (),
-                {
-                    "max_retries": 3,
-                    "base_delay": 0.01,
-                    "max_delay": 0.05,
-                    "multiplier": 1.0,
-                    "retryable_exceptions": (PubSubServerError,),
-                    "retryable_status_codes": {500, 502, 503, 504},
-                },
-            )()
+            retry_config = RetryConfig(
+                max_retries=3,
+                base_delay=0.01,
+                max_delay=0.05,
+                multiplier=1.0,
+                retryable_exceptions=(PubSubServerError,),
+                retryable_status_codes={500, 502, 503, 504},
+            )
 
         return PubSubPublisher(
             topic_id="test-topic",
@@ -289,18 +285,14 @@ class TestPublisherRetryIntegration:
         publisher = self._make_publisher(
             auth_provider,
             side_effect=[error_response] * 10,
-            retry_config=type(
-                "RetryConfig",
-                (),
-                {
-                    "max_retries": 2,
-                    "base_delay": 0.01,
-                    "max_delay": 0.05,
-                    "multiplier": 1.0,
-                    "retryable_exceptions": (PubSubServerError,),
-                    "retryable_status_codes": {503},
-                },
-            )(),
+            retry_config=RetryConfig(
+                max_retries=2,
+                base_delay=0.01,
+                max_delay=0.05,
+                multiplier=1.0,
+                retryable_exceptions=(PubSubServerError,),
+                retryable_status_codes={503},
+            ),
         )
 
         with pytest.raises(PubSubRetryError):
