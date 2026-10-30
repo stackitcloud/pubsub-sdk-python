@@ -1,19 +1,22 @@
 # pubsub-sdk-python
 
+[![PyPI](https://img.shields.io/pypi/v/pubsub-sdk-python)](https://pypi.org/project/pubsub-sdk-python/)
+[![Python](https://img.shields.io/pypi/pyversions/pubsub-sdk-python)](https://pypi.org/project/pubsub-sdk-python/)
+
 Python SDK for the **STACKIT PubSub Data Plane API**.
 
 This SDK covers the **data plane only** (publish, pull, ack, nack). Creating/deleting topics and subscriptions, and granting publisher/subscriber access, is done via the separate STACKIT PubSub **control plane** REST API (see `tests/integration/conftest.py` for example calls) or the STACKIT Portal.
 
 ## Install
 
-Not published to PyPI yet — every GitHub Release publishes `pubsub-sdk-python` to PyPI automatically (see `.github/workflows/release.yml`), so once a release is cut:
+The SDK is published to [PyPI](https://pypi.org/project/pubsub-sdk-python/) as `pubsub-sdk-python`. Every GitHub Release publishes a new version automatically (see `.github/workflows/release.yml`); check the badge above or the [releases page](https://github.com/stackitcloud/pubsub-sdk-python/releases) for the latest version.
 
 ```bash
 pip install pubsub-sdk-python
 # or: uv add pubsub-sdk-python
 ```
 
-Until then, install from source with [uv](https://docs.astral.sh/uv/):
+To work on the SDK itself, install from source with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv sync --group dev
