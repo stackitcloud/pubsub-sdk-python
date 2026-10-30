@@ -1,7 +1,7 @@
 # pubsub-sdk-python
 
 [![PyPI](https://img.shields.io/pypi/v/pubsub-sdk-python)](https://pypi.org/project/pubsub-sdk-python/)
-[![Python](https://img.shields.io/pypi/pyversions/pubsub-sdk-python)](https://pypi.org/project/pubsub-sdk-python/)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)](https://pypi.org/project/pubsub-sdk-python/)
 
 Python SDK for the **STACKIT PubSub Data Plane API**.
 
